@@ -122,15 +122,15 @@ if [[ -f "$BUNDLE_DOCKERFILE" ]]; then
 
   # Remove ARG declarations
   if grep -q "^ARG ${GIT_URL_LABEL}=" "$BUNDLE_DOCKERFILE" 2>/dev/null; then
-    sed -i '' "/^ARG ${GIT_URL_LABEL}=/d" "$BUNDLE_DOCKERFILE"
-    sed -i '' "/^ARG ${GIT_COMMIT_LABEL}=/d" "$BUNDLE_DOCKERFILE"
+    sed -i.bak "/^ARG ${GIT_URL_LABEL}=/d" "$BUNDLE_DOCKERFILE" && rm -f "$BUNDLE_DOCKERFILE.bak"
+    sed -i.bak "/^ARG ${GIT_COMMIT_LABEL}=/d" "$BUNDLE_DOCKERFILE" && rm -f "$BUNDLE_DOCKERFILE.bak"
     DOCKERFILE_CHANGED=true
   fi
 
   # Remove LABEL entries (component.git.url and component.git.commit lines)
   if grep -q "${COMPONENT_NAME}\.git\.url=" "$BUNDLE_DOCKERFILE" 2>/dev/null; then
-    sed -i '' "/${COMPONENT_NAME}\.git\.url=/d" "$BUNDLE_DOCKERFILE"
-    sed -i '' "/${COMPONENT_NAME}\.git\.commit=/d" "$BUNDLE_DOCKERFILE"
+    sed -i.bak "/${COMPONENT_NAME}\.git\.url=/d" "$BUNDLE_DOCKERFILE" && rm -f "$BUNDLE_DOCKERFILE.bak"
+    sed -i.bak "/${COMPONENT_NAME}\.git\.commit=/d" "$BUNDLE_DOCKERFILE" && rm -f "$BUNDLE_DOCKERFILE.bak"
     DOCKERFILE_CHANGED=true
   fi
 
@@ -147,8 +147,8 @@ if [[ -f "$BUNDLE_ARGS_MAP" ]]; then
   GIT_COMMIT_LABEL="$(echo "$COMPONENT_NAME" | tr '[:lower:]-' '[:upper:]_')_GIT_COMMIT"
 
   if grep -q "^${GIT_URL_LABEL}=" "$BUNDLE_ARGS_MAP" 2>/dev/null; then
-    sed -i '' "/^${GIT_URL_LABEL}=/d" "$BUNDLE_ARGS_MAP"
-    sed -i '' "/^${GIT_COMMIT_LABEL}=/d" "$BUNDLE_ARGS_MAP"
+    sed -i.bak "/^${GIT_URL_LABEL}=/d" "$BUNDLE_ARGS_MAP" && rm -f "$BUNDLE_ARGS_MAP.bak"
+    sed -i.bak "/^${GIT_COMMIT_LABEL}=/d" "$BUNDLE_ARGS_MAP" && rm -f "$BUNDLE_ARGS_MAP.bak"
     FILES_CHANGED="$FILES_CHANGED bundle/bundle_build_args.map"
     CHANGES_MADE=true
   fi
