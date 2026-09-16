@@ -69,9 +69,14 @@ if [[ "$HTTP_STATUS" != "200" ]]; then
   exit 2
 fi
 
+FORK_URL=$(bash "$SCRIPTS_DIR/ensure_github_fork.sh" --upstream-url "$RKC_URL") || {
+  echo "ERROR: Could not ensure fork of $RKC_URL." >&2; exit 1
+}
+
 cd "$WORKDIR"
 PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
   --src-url     "$RKC_URL" \
+  --dest-url    "$FORK_URL" \
   --src-branch  "main" \
   --dest-branch "${JIRA_ID}-offboard-pull" \
   --sparse-files "pipelineruns/$REPO_NAME") || {
@@ -87,15 +92,15 @@ TARGET_FILE="$TEKTON_DIR/$PIPELINERUN_FILE"
 cd "$CLONE_DIR"
 git add -A
 git commit -m "Remove ${COMPONENT_NAME} pull-request PipelineRun (offboarding)"
-git push origin "$DEST_BRANCH" || {
+git push dest "$DEST_BRANCH" || {
   git fetch --unshallow origin 2>/dev/null || true
-  git push origin "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
+  git push dest "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
 }
 
 PR_URL=""
 for attempt in 1 2 3; do
   PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-    --src-url     "$RKC_URL" \
+    --src-url     "$FORK_URL" \
     --src-branch  "$DEST_BRANCH" \
     --dest-url    "$RKC_URL" \
     --dest-branch "main" \

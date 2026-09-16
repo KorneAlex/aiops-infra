@@ -68,6 +68,13 @@ echo "COMPONENT_NAME : $COMPONENT_NAME"
 echo "REPO_URL       : $REPO_URL"
 echo "REPO_NAME      : $REPO_NAME"
 
+# All cleanup PR(s) are contributed via a fork of the component repo owned by
+# $GITHUB_USER — changes are pushed to the fork ('dest' remote) and a cross-repo
+# PR is opened against the upstream component repo.
+FORK_URL=$(bash "$SCRIPTS_DIR/ensure_github_fork.sh" --upstream-url "$REPO_URL") || {
+  echo "ERROR: Could not ensure fork of $REPO_URL." >&2; exit 1
+}
+
 PR_URLS_RAISED=""
 
 if [[ "$PRODUCT_CONTEXT" == "RHOAI" ]]; then
@@ -93,6 +100,7 @@ if [[ "$PRODUCT_CONTEXT" == "RHOAI" ]]; then
     cd "$WORKDIR"
     PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
       --src-url     "$REPO_URL" \
+      --dest-url    "$FORK_URL" \
       --src-branch  "$PUSH_BRANCH" \
       --dest-branch "${JIRA_ID}-tekton-cleanup" \
       --sparse-files ".tekton") || {
@@ -112,15 +120,15 @@ The sync-pipelineruns workflow does not delete files removed from
 konflux-central. This commit cleans up the stale PipelineRun.
 
 Related: ${JIRA_ID}"
-      git push origin "$DEST_BRANCH" || {
+      git push dest "$DEST_BRANCH" || {
         git fetch --unshallow origin 2>/dev/null || true
-        git push origin "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
+        git push dest "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
       }
 
       PUSH_PR_URL=""
       for attempt in 1 2 3; do
         PUSH_PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-          --src-url     "$REPO_URL" \
+          --src-url     "$FORK_URL" \
           --src-branch  "$DEST_BRANCH" \
           --dest-url    "$REPO_URL" \
           --dest-branch "$PUSH_BRANCH" \
@@ -157,6 +165,7 @@ Jira: ${JIRA_URL}" 2>/dev/null) && break
       cd "$WORKDIR"
       PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
         --src-url     "$REPO_URL" \
+        --dest-url    "$FORK_URL" \
         --src-branch  "main" \
         --dest-branch "${JIRA_ID}-tekton-cleanup-pull" \
         --sparse-files ".tekton") || {
@@ -176,15 +185,15 @@ The sync-pipelineruns workflow does not delete files removed from
 konflux-central. This commit cleans up the stale PipelineRun.
 
 Related: ${JIRA_ID}"
-        git push origin "$DEST_BRANCH" || {
+        git push dest "$DEST_BRANCH" || {
           git fetch --unshallow origin 2>/dev/null || true
-          git push origin "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
+          git push dest "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
         }
 
         PULL_PR_URL=""
         for attempt in 1 2 3; do
           PULL_PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-            --src-url     "$REPO_URL" \
+            --src-url     "$FORK_URL" \
             --src-branch  "$DEST_BRANCH" \
             --dest-url    "$REPO_URL" \
             --dest-branch "main" \
@@ -240,6 +249,7 @@ else
     cd "$WORKDIR"
     PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
       --src-url     "$REPO_URL" \
+      --dest-url    "$FORK_URL" \
       --src-branch  "main" \
       --dest-branch "${JIRA_ID}-tekton-cleanup" \
       --sparse-files ".tekton") || {
@@ -269,15 +279,15 @@ The sync-pipelineruns workflow does not delete files removed from
 konflux-central. This commit cleans up the stale PipelineRuns.
 
 Related: ${JIRA_ID}"
-      git push origin "$DEST_BRANCH" || {
+      git push dest "$DEST_BRANCH" || {
         git fetch --unshallow origin 2>/dev/null || true
-        git push origin "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
+        git push dest "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
       }
 
       PR_URL=""
       for attempt in 1 2 3; do
         PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-          --src-url     "$REPO_URL" \
+          --src-url     "$FORK_URL" \
           --src-branch  "$DEST_BRANCH" \
           --dest-url    "$REPO_URL" \
           --dest-branch "main" \

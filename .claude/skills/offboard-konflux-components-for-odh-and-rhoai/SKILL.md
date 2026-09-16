@@ -38,11 +38,29 @@ executes pending steps, and posts a summary of status changes only.
 
 **Jira:** `JIRA_USER_EMAIL`, `JIRA_API_TOKEN`
 **GitLab (VPN required):** `GITLAB_USER`, `GITLAB_TOKEN` (api + write_repository scope)
-**GitHub:** `GITHUB_USER`, `GITHUB_TOKEN` (repo scope)
+**GitHub:** `GITHUB_USER`, `GITHUB_TOKEN` (classic PAT with `repo` scope)
 **OpenShift:** Handled automatically — the skill prompts for `oc login --web` if no valid session exists
 **Tools:** `uv`, `git`, `oc`, `skopeo`, `yamllint`, `jq`, `kustomize` (or `kubectl`)
 
 **VPN:** Checked automatically at startup — the skill verifies connectivity to gitlab.cee.redhat.com.
+
+### GitHub fork model
+
+Every GitHub step (`remove-from-okc`, `remove-pull-pipelines`, `remove-from-bundle`,
+`remove-from-operator`, `sync-component-tekton`) contributes **via a fork** — it never
+pushes directly to the upstream repo:
+
+1. `ensure_github_fork.sh` guarantees a fork of the upstream repo exists under
+   `$GITHUB_USER` (creating it if needed) and best-effort syncs the fork with upstream.
+2. The playpen clones from upstream, creates the offboarding branch, and pushes it to
+   the fork (`dest` remote).
+3. `raise_github_pr.py` opens a **cross-repo** PR from `$GITHUB_USER:<branch>` into the
+   upstream repo.
+
+This means `GITHUB_TOKEN` only needs permission to fork and push to your own forks — no
+write access to the upstream `opendatahub-io` / `red-hat-data-services` repos is required.
+Because fork creation and self-fork pushes are needed, use a **classic PAT with `repo`
+scope**; fine-grained tokens in some accounts cannot create forks or push to them.
 
 ## Dry Run
 
@@ -512,9 +530,10 @@ Re-run this skill after PRs/MRs are merged to advance the pipeline.
 | YAML fails schema validation | 3 | Fix YAML, re-upload to Jira, re-run |
 | VPN not active | 7a | Activate Red Hat VPN; re-run (idempotent) |
 | KRD MR fails | 7a | Check VPN; GITLAB_TOKEN needs write_repository scope |
-| OKC/RKC PR fails | 7b | Verify GITHUB_TOKEN repo scope and push access |
-| Pull pipelines PR fails | 7c | Check GITHUB_TOKEN push access to rhoai-konflux-central |
-| Bundle PR fails | 7d | Verify GITHUB_TOKEN push access to build-config repo |
-| Operator PR fails | 7e | Verify GITHUB_TOKEN push access to operator repo |
-| Tekton cleanup PR fails | 7h | Verify GITHUB_TOKEN push access to the component repo |
+| OKC/RKC PR fails | 7b | Classic PAT with `repo` scope needed to fork + push to your fork (see GitHub fork model) |
+| Pull pipelines PR fails | 7c | Classic PAT with `repo` scope needed to fork + push to your fork |
+| Bundle PR fails | 7d | Classic PAT with `repo` scope needed to fork + push to your fork |
+| Operator PR fails | 7e | Classic PAT with `repo` scope needed to fork + push to your fork |
+| Tekton cleanup PR fails | 7h | Classic PAT with `repo` scope needed to fork + push to your fork |
+| Fork creation fails | 7b–7h | GITHUB_TOKEN must be a classic PAT with `repo` scope (fine-grained tokens may not fork) |
 | State lost / fresh checkout | Any | Re-run; pipeline state rebuilt from Jira labels |

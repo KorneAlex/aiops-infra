@@ -85,9 +85,14 @@ if [[ "$PRODUCT_CONTEXT" == "RHOAI" ]]; then
     exit 2
   fi
 
+  FORK_URL=$(bash "$SCRIPTS_DIR/ensure_github_fork.sh" --upstream-url "$CENTRAL_URL") || {
+    echo "ERROR: Could not ensure fork of $CENTRAL_URL." >&2; exit 1
+  }
+
   cd "$WORKDIR"
   PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
     --src-url     "$CENTRAL_URL" \
+    --dest-url    "$FORK_URL" \
     --src-branch  "$SRC_BRANCH" \
     --dest-branch "${JIRA_ID}-offboard" \
     --sparse-files "pipelineruns/$REPO_NAME") || {
@@ -136,9 +141,14 @@ else
     exit 2
   fi
 
+  FORK_URL=$(bash "$SCRIPTS_DIR/ensure_github_fork.sh" --upstream-url "$CENTRAL_URL") || {
+    echo "ERROR: Could not ensure fork of $CENTRAL_URL." >&2; exit 1
+  }
+
   cd "$WORKDIR"
   PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
     --src-url     "$CENTRAL_URL" \
+    --dest-url    "$FORK_URL" \
     --src-branch  "main" \
     --dest-branch "${JIRA_ID}-offboard" \
     --sparse-files "pipelineruns/$REPO_NAME") || {
@@ -159,15 +169,15 @@ fi
 cd "$CLONE_DIR"
 git add -A
 git commit -m "$COMMIT_MSG"
-git push origin "$DEST_BRANCH" || {
+git push dest "$DEST_BRANCH" || {
   git fetch --unshallow origin 2>/dev/null || true
-  git push origin "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
+  git push dest "$DEST_BRANCH" || { echo "ERROR: Push failed." >&2; exit 1; }
 }
 
 PR_URL=""
 for attempt in 1 2 3; do
   PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-    --src-url     "$CENTRAL_URL" \
+    --src-url     "$FORK_URL" \
     --src-branch  "$DEST_BRANCH" \
     --dest-url    "$CENTRAL_URL" \
     --dest-branch "$PR_TARGET" \

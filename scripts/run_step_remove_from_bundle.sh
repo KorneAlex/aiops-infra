@@ -79,8 +79,13 @@ else
   SPARSE="bundle"
 fi
 
+FORK_URL=$(bash "$SCRIPTS_DIR/ensure_github_fork.sh" --upstream-url "$BC_URL") || {
+  echo "ERROR: Could not ensure fork of $BC_URL." >&2; exit 1
+}
+
 PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
   --src-url     "$BC_URL" \
+  --dest-url    "$FORK_URL" \
   --src-branch  "$SRC_BRANCH" \
   --dest-branch "${JIRA_ID}-offboard" \
   --sparse-files "$SPARSE") || {
@@ -176,12 +181,13 @@ bash "$SCRIPTS_DIR/git_commit_push.sh" \
   --clone-dir "$CLONE_DIR" \
   --files     "$FILES_CHANGED" \
   --message   "Remove ${COMPONENT_NAME} from bundle relatedImages (offboarding)" \
-  --branch    "$DEST_BRANCH"
+  --branch    "$DEST_BRANCH" \
+  --remote    "dest"
 
 PR_URL=""
 for attempt in 1 2 3; do
   PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-    --src-url     "$BC_URL" \
+    --src-url     "$FORK_URL" \
     --src-branch  "$DEST_BRANCH" \
     --dest-url    "$BC_URL" \
     --dest-branch "$SRC_BRANCH" \

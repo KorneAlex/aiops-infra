@@ -73,9 +73,14 @@ else
   OPERATOR_TARGET_BRANCH="main"
 fi
 
+FORK_URL=$(bash "$SCRIPTS_DIR/ensure_github_fork.sh" --upstream-url "$ODH_OPERATOR_URL") || {
+  echo "ERROR: Could not ensure fork of $ODH_OPERATOR_URL." >&2; exit 1
+}
+
 cd "$WORKDIR"
 PLAYPEN_OUTPUT=$(bash "$SCRIPTS_DIR/setup_github_playpen.sh" \
   --src-url     "$ODH_OPERATOR_URL" \
+  --dest-url    "$FORK_URL" \
   --src-branch  "$OPERATOR_TARGET_BRANCH" \
   --dest-branch "${JIRA_ID}-offboard" \
   --sparse-files "build/manifests-config.yaml") || {
@@ -110,12 +115,13 @@ bash "$SCRIPTS_DIR/git_commit_push.sh" \
   --clone-dir "$CLONE_DIR" \
   --files     "build/manifests-config.yaml" \
   --message   "Remove ${COMPONENT_NAME} from operator manifests (offboarding)" \
-  --branch    "$DEST_BRANCH"
+  --branch    "$DEST_BRANCH" \
+  --remote    "dest"
 
 PR_URL=""
 for attempt in 1 2 3; do
   PR_URL=$(uv run --script "$SCRIPTS_DIR/raise_github_pr.py" \
-    --src-url     "$ODH_OPERATOR_URL" \
+    --src-url     "$FORK_URL" \
     --src-branch  "$DEST_BRANCH" \
     --dest-url    "$ODH_OPERATOR_URL" \
     --dest-branch "$OPERATOR_TARGET_BRANCH" \
