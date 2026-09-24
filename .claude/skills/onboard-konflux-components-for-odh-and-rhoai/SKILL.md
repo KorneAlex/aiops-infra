@@ -462,14 +462,16 @@ Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
 ## Step 9: Handle Workflow Triggers
 
 Workflow triggers execute once their dependencies are merged. `onboarder_workflow`
-produces a Tekton PR URL that must be tracked (record as `pr_raised`); `renovate_sync`
-completes with no URL and is marked `done` immediately.
+runs the CI onboarder; `onboarder_release` runs the optional Release onboarder when
+`odh_release_tag` is set in the YAML. Both produce Tekton PR URLs that must be tracked
+(record as `pr_raised`); `renovate_sync` completes with no URL and is marked `done` immediately.
 
-### Step 9a: run-odh-konflux-onboarder-workflow (step key: `onboarder_workflow`, ODH only)
+### Step 9a: run-odh-konflux-onboarder-workflow — CI (step key: `onboarder_workflow`, ODH only)
 
 **Execute if** `onboarder_workflow` is in `UNBLOCKED_STEPS` and `PRODUCT_CONTEXT == "ODH"`.
 
 The `depends_on: ["krd", "okc"]` check in Step 7 ensures both are merged before this runs.
+Always triggers the CI onboarder (`build_type=CI` on `repo_branch`).
 
 ```bash
 OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_odh_onboarder_workflow.sh" --jira-url "$JIRA_URL")
@@ -477,6 +479,19 @@ EXIT_CODE=$?
 ```
 
 Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
+
+### Step 9a-release: run-odh-konflux-onboarder-workflow — Release (step key: `onboarder_release`, ODH only)
+
+**Execute if** `onboarder_release` is in `UNBLOCKED_STEPS` and `PRODUCT_CONTEXT == "ODH"`.
+
+Skipped automatically when `odh_release_tag` is absent from the YAML. Does not block `bundle`.
+
+```bash
+OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_odh_onboarder_workflow.sh" --release --jira-url "$JIRA_URL")
+EXIT_CODE=$?
+```
+
+Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`. Exit 2 means Release not requested — step marked skipped.
 
 ### Step 9b: sync-rhoai-renovate-configs (step key: `renovate_sync`, RHOAI only)
 
@@ -627,6 +642,7 @@ PRs / MRs:
   renovate        : <steps.renovate.status or "N/A (ODH)">
   renovate_sync   : <steps.renovate_sync.status or "N/A (ODH)">
   onboarder_workflow: <steps.onboarder_workflow.status or "N/A (RHOAI)">
+  onboarder_release: <steps.onboarder_release.status or "N/A (RHOAI)">
 
 Newly merged this run : <NEWLY_MERGED or "none">
 State file            : $PIPELINE_STATE

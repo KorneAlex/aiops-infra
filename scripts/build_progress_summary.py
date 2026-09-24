@@ -28,7 +28,8 @@ STEPS_ODH = [
     ("quay",              "Create Quay repo",                "mr_url"),
     ("krd",               "Onboard to Konflux release data", "mr_url"),
     ("okc",               "Add to ODH Konflux central",      "pr_url"),
-    ("onboarder_workflow","Trigger ODH onboarder workflow",   "pr_url"),
+    ("onboarder_workflow","Trigger ODH CI onboarder workflow",    "pr_url"),
+    ("onboarder_release", "Trigger ODH Release onboarder workflow","pr_url"),
     ("operator",          "Integrate with ODH Operator",     "pr_url"),
     ("bundle",            "Integrate with bundle",           "pr_url"),
 ]

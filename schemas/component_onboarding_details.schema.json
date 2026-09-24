@@ -65,7 +65,12 @@
         },
         "odh_release_tag": {
           "type": "string",
-          "description": "Version tag for ODH Release builds (e.g. 2.21.0). Required when product_context is ODH and build_type is Release.",
+          "description": "Optional ODH release version tag (e.g. 2.21.0). When set, the orchestrator also runs the Release onboarder workflow. Legacy tickets may use build_type Release instead.",
+          "minLength": 1
+        },
+        "odh_release_branch": {
+          "type": "string",
+          "description": "ODH release branch for the optional Release onboarder (default stable when odh_release_tag is set).",
           "minLength": 1
         },
         "architectures": {

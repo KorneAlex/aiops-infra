@@ -143,14 +143,15 @@ Re-ask if the answer is invalid (explain why and show valid options).
 **Q2 — Product-context-specific question**
 
 _If `product_context == ODH`:_
-> Is this a CI build or a Release build?
-> Options: CI, Release
 
-→ Store in `build_type`. Must be `CI` or `Release`.
+> Also onboard this component for an ODH Release?
+> Options: yes, no
 
-**Q2.5 — ODH Release tag (ODH + Release only)**
+→ Store `odh_release_enabled` as `true` or `false`.
 
-_Execute only when `product_context == ODH` and `build_type == Release`. Skip entirely otherwise._
+**Q2.5 — ODH Release tag (ODH + yes only)**
+
+_Execute only when `product_context == ODH` and `odh_release_enabled == true`. Skip entirely otherwise._
 
 > What is the version tag for this release build?
 > (e.g. 2.21.0)
@@ -158,7 +159,16 @@ _Execute only when `product_context == ODH` and `build_type == Release`. Skip en
 → Store in `odh_release_tag`. Must be non-empty.
   Re-ask if empty.
 
-**Q2.6 — Target RHOAI version (ODH only)**
+**Q2.6 — ODH Release branch (ODH + yes only)**
+
+_Execute only when `product_context == ODH` and `odh_release_enabled == true`. Skip entirely otherwise._
+
+> Which branch should the Release onboarder target?
+> Press Enter to accept the default [stable], or enter a branch name.
+
+→ Store in `odh_release_branch` (default `stable` when left empty).
+
+**Q2.7 — Target RHOAI version (ODH only)**
 
 _Execute only when `product_context == ODH`. Skip entirely for RHOAI._
 
@@ -394,8 +404,8 @@ Display a summary table of all collected values:
 Component onboarding details collected:
 
   product_context              : <value>
-  build_type / architectures   : <value>
-  odh_release_tag              : <value or N/A>   # only shown for ODH Release
+  odh_release_tag              : <value or N/A>   # ODH only, when Release requested
+  odh_release_branch           : <value or N/A>   # ODH only, when Release requested
   target_rhoai_version         : <value or N/A>   # ODH (Jira sprint) and RHOAI
   component_name               : <value>
   release_category             : <value or N/A>   # only shown for RHOAI
@@ -434,11 +444,11 @@ YAML_ARGS=(
   --dockerfile-path "$dockerfile_path"
 )
 
-# ODH-only
+# ODH-only — always CI; optional Release fields when requested
 if [[ "$product_context" == "ODH" ]]; then
-  YAML_ARGS+=(--build-type "$build_type")
-  if [[ "$build_type" == "Release" ]]; then
+  if [[ "${odh_release_enabled:-false}" == "true" ]]; then
     YAML_ARGS+=(--odh-release-tag "$odh_release_tag")
+    [[ -n "${odh_release_branch:-}" ]] && YAML_ARGS+=(--odh-release-branch "$odh_release_branch")
   fi
 fi
 
