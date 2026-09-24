@@ -58,6 +58,8 @@ LABEL_MAP: dict[str, tuple[str, str]] = {
     "tekton-pr-raised":             ("onboarder_workflow",  "pr_raised"),
     "onboarder-workflow-triggered": ("onboarder_workflow",  "pr_raised"),
     "tekton-pr-merged":             ("onboarder_workflow",  "done"),
+    "tekton-release-pr-raised":     ("onboarder_release",   "pr_raised"),
+    "tekton-release-pr-merged":     ("onboarder_release",   "done"),
     # validate
     "yaml-attached":             ("validate",         "done"),
     "validation-successful":     ("validate",         "done"),
@@ -115,9 +117,9 @@ SHARED_URL_PATTERNS: list[tuple[str, str, re.Pattern, re.Pattern]] = [
                                    re.compile(r"\[step:pull_pipelines\]|pull.request\s+PipelineRun", re.I)),
     ("renovate",        "pr_url",  re.compile(r"konflux-central/pull/", re.I),
                                    re.compile(r"\[step:renovate\]|enable\s+Renovate", re.I)),
+    ("onboarder_release", "pr_url", re.compile(r"github\.com/[^/]+/[^/]+/pull/", re.I),
+                                   re.compile(r"\[step:onboarder_release\]", re.I)),
 ]
-
-# Steps whose PR targets a variable repo (no URL pattern possible).
 # Labels confirm the step ran; first unclaimed URL is assigned.
 UNCLAIMED_URL_STEPS: list[tuple[str, str]] = [
     ("onboarder_workflow", "pr_url"),
@@ -162,7 +164,7 @@ def extract_urls_from_comment(body) -> list[str]:
 
 
 # Steps that are bypassed under ONBOARD_DRY_RUN — never restore to pr_raised from labels
-_DRY_RUN_BYPASS_STEPS = {"onboarder_workflow", "renovate_sync"}
+_DRY_RUN_BYPASS_STEPS = {"onboarder_workflow", "onboarder_release", "renovate_sync"}
 
 
 def sync_labels(state: dict, labels: list[str]) -> list[str]:
