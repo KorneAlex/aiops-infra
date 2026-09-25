@@ -15,8 +15,7 @@
         "repo_branch",
         "context_path",
         "dockerfile_path",
-        "is_operator",
-        "slack_team_handle"
+        "is_operator"
       ],
       "additionalProperties": false,
       "properties": {

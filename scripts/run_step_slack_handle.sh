@@ -10,7 +10,8 @@
 # Exit codes:
 #   0  PR raised — prints PR_URL=<url>; writes pipeline_state.json
 #   1  Unexpected failure; pipeline_state.json NOT written
-#   2  Entry already exists — writes pipeline_state.json (status=done)
+#   2  Entry already exists, OR slack_team_handle missing from an older YAML
+#      (skipped — see below); writes pipeline_state.json (status=done or skipped)
 set -euo pipefail
 
 export PATH="${HOME}/.local/bin:${PATH}"
@@ -51,11 +52,23 @@ COMPONENT_NAME=$(grep -m1 'component_name:' "$YAML_FILE" | awk '{print $2}')
 
 SLACK_TEAM_HANDLE=$(grep -m1 'slack_team_handle:' "$YAML_FILE" | awk '{print $2}' || true)
 SLACK_TEAM_CHANNEL=$(grep -m1 'slack_team_channel:' "$YAML_FILE" | awk '{print $2}' || true)
-[[ -z "$SLACK_TEAM_HANDLE" ]] && {
-  echo "ERROR: slack_team_handle missing from component_onboarding_details.yaml." >&2
-  echo "Re-run create-component-onboarding-jira to collect the team's Slack handle." >&2
-  exit 1
-}
+
+# Gate: skip (not a hard failure) when slack_team_handle is absent. This field
+# is required by /create-component-onboarding-jira going forward, but the
+# schema does NOT require it (RHOAIENG-85559 was added after many components
+# were already onboarded/in-flight) — hard-failing here would halt the ENTIRE
+# orchestrator run for every older ticket missing it, per the orchestrator's
+# exit-1 contract. Skipping lets the rest of the pipeline proceed normally;
+# re-running create-component-onboarding-jira later can backfill the field.
+if [[ -z "$SLACK_TEAM_HANDLE" ]]; then
+  echo "slack_team_handle not present in component_onboarding_details.yaml — skipping slack_handle step."
+  uv run --script "$SCRIPTS_DIR/update_jira_issue.py" "$JIRA_URL" \
+    --add-label "slack-routing-not-provided" \
+    --comment "[step:slack_handle] Skipping Slack routing for '${COMPONENT_NAME}' — no slack_team_handle in component_onboarding_details.yaml (this field was added after this ticket started, see RHOAIENG-85559). This step is now marked 'skipped' and will not retry automatically; if you'd like it added later, re-run /create-component-onboarding-jira to collect the handle, then ask a DevOps guardian to reset the slack_handle step to 'pending' in pipeline_state.json." || true
+  bash "$SCRIPTS_DIR/update_pipeline_state.sh" \
+    --state "$PIPELINE_STATE" --step slack_handle --status skipped
+  exit 2
+fi
 
 RDI_URL="${RHODS_DEVOPS_INFRA_REPO_URL:-https://github.com/red-hat-data-services/rhods-devops-infra.git}"
 echo "RHODS_DEVOPS_INFRA_REPO_URL=${RHODS_DEVOPS_INFRA_REPO_URL:-(not set, using default)}"
