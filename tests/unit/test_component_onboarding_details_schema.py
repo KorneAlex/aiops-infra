@@ -29,6 +29,7 @@ def _odh_payload(component_name: str) -> dict:
             "dockerfile_path": "Dockerfile",
             "is_operator": False,
             "build_type": "CI",
+            "slack_team_handle": "openshift-ai-devtestops-ic",
         }
     }
 

@@ -7,7 +7,7 @@
 
 slackdump can list channels but cannot list user groups. Handle verification
 therefore uses:
-  1. Optional routing YAML (rhoai-component-data.yaml) — known handles
+  1. Optional routing YAML (team-slack-handles.yaml) — known handles
   2. Otherwise status=unknown (caller must confirm with the user)
 
 Channel lookup uses `slackdump list channels`.
@@ -20,7 +20,6 @@ import json
 import os
 import re
 import shutil
-import ssl
 import subprocess
 import sys
 import tempfile
@@ -32,14 +31,16 @@ _scripts_dir = str(Path(__file__).resolve().parent)
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-import upsert_rhoai_component_contact as routing  # noqa: E402
+import upsert_team_slack_handle as routing  # noqa: E402
 
 SLACKDUMP_CACHE_DIR = Path.home() / ".cache" / "slackdump"
 CHANNEL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-_]*$")
 CHANNEL_URL_RE = re.compile(r"slack\.com/archives/([A-Z0-9]+)", re.I)
+# team-slack-handles.yaml lives in the private red-hat-data-services/rhods-devops-infra
+# GitHub repo (RH-employees-only via org membership) — see RHOAIENG-85559.
 DEFAULT_ROUTING_API_URL = (
-    "https://gitlab.cee.redhat.com/api/v4/projects/wznoinsk%2Frhoai-monitoring"
-    "/repository/files/data%2Frhoai-component-data.yaml/raw?ref=main"
+    "https://api.github.com/repos/red-hat-data-services/rhods-devops-infra"
+    "/contents/src/config/team-slack-handles.yaml?ref=main"
 )
 
 
@@ -217,23 +218,18 @@ def lookup_channel(name: str) -> dict:
     }
 
 
-def _ssl_context():
-    val = os.environ.get("GITLAB_SSL_VERIFY", "false").strip().lower()
-    if val in {"0", "false", "no", "off"}:
-        return ssl._create_unverified_context()
-    return ssl.create_default_context()
-
-
 def fetch_routing_yaml(url: str | None = None) -> str | None:
-    """Fetch rhoai-component-data.yaml from GitLab. Returns None on any failure."""
-    target = url or os.environ.get("RHOAI_COMPONENT_DATA_URL") or DEFAULT_ROUTING_API_URL
-    token = os.environ.get("GITLAB_TOKEN", "").strip()
+    """Fetch team-slack-handles.yaml from the private rhods-devops-infra GitHub
+    repo (raw content via the Contents API). Returns None on any failure
+    (including auth/network issues — callers fall back to status=unknown)."""
+    target = url or os.environ.get("TEAM_SLACK_HANDLES_URL") or DEFAULT_ROUTING_API_URL
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
     request = urllib.request.Request(target)
+    request.add_header("Accept", "application/vnd.github.raw")
     if token:
-        request.add_header("PRIVATE-TOKEN", token)
-        request.add_header("Authorization", f"Bearer {token}")
+        request.add_header("Authorization", f"token {token}")
     try:
-        with urllib.request.urlopen(request, context=_ssl_context(), timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:
             body = response.read()
             if response.status != 200:
                 return None
@@ -292,11 +288,11 @@ def main() -> int:
 
     p_ug = sub.add_parser("lookup-usergroup")
     p_ug.add_argument("--handle", required=True)
-    p_ug.add_argument("--routing-yaml", default="", help="Optional path to rhoai-component-data.yaml")
+    p_ug.add_argument("--routing-yaml", default="", help="Optional path to team-slack-handles.yaml")
     p_ug.add_argument(
         "--no-fetch-routing",
         action="store_true",
-        help="Do not fetch the routing YAML from GitLab when --routing-yaml is omitted",
+        help="Do not fetch the routing YAML from GitHub when --routing-yaml is omitted",
     )
 
     args = parser.parse_args()

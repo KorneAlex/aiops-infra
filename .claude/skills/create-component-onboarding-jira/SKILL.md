@@ -140,6 +140,59 @@ Re-ask if the answer is invalid (explain why and show valid options).
 
 → Store in `product_context`. Must be exactly `ODH` or `RHOAI` (case-insensitive input, store uppercase).
 
+**Q1.5 — Team Slack handle (always, both products)**
+
+> Which team is responsible for this component? Give me their Slack user-group handle
+> (the `@handle` used to mention the team in Slack), e.g. `ai-core-platform`.
+>
+> This gets published to a shared Slack-routing file (`team-slack-handles.yaml` in the
+> private `rhods-devops-infra` repo) so build/onboarding guardians can always find the
+> right team to contact — see RHOAIENG-85559.
+
+→ Normalize: strip a leading `@`, lowercase. Validate against `^[a-z0-9]+(-[a-z0-9]+)*$`
+  (lowercase letters, numbers, and hyphens only). Re-ask if invalid, showing an example.
+
+Verify the handle against the known-handles list (best-effort — slackdump cannot list
+Slack user-groups, so this only confirms handles already recorded elsewhere). The script
+prints a JSON object to stdout and exits non-zero whenever `status != "found"` — parse
+the JSON regardless of exit code, don't treat non-zero as fatal here:
+
+```bash
+uv run --script scripts/lookup_slack_target.py lookup-usergroup --handle "$slack_team_handle"
+```
+
+- `status == "found"` → proceed silently.
+- `status == "unknown"` → this is the normal/expected result for a new or first-time
+  team (slackdump cannot enumerate Slack user-groups, only cross-check against handles
+  already on file); ask the user to confirm:
+  > I can't verify `@<slack_team_handle>` exists in Slack (this only checks handles
+  > already on file, not the full Slack user-group list). Is `@<slack_team_handle>`
+  > correct? (yes / no)
+  - `yes` → proceed. `no` → re-ask Q1.5.
+- `status == "invalid"` → re-ask Q1.5 (should not happen after client-side validation above).
+- `status == "error"` (e.g. GitHub fetch failed) → treat the same as `unknown`.
+
+→ Store in `slack_team_handle`.
+
+**Q1.6 — Optional Slack channel (always, both products)**
+
+> Do you also want to record a specific Slack channel for this component?
+> (optional — press Enter to skip)
+
+- Empty input → leave `slack_team_channel` unset.
+- Non-empty → strip a leading `#`, lowercase, then best-effort verify:
+
+```bash
+uv run --script scripts/lookup_slack_target.py lookup-channel --name "$slack_team_channel"
+```
+
+Again, parse the printed JSON regardless of exit code. If `status` is `"not_found"`,
+`"error"`, or `"invalid"` (i.e. not `"found"`), warn but do not block — slackdump auth
+may not be configured in this environment:
+> Warning: could not verify channel `#<slack_team_channel>` exists (<error>). Continuing anyway.
+
+→ Store in `slack_team_channel` when provided.
+
 **Q2 — Product-context-specific question**
 
 _If `product_context == ODH`:_
@@ -394,6 +447,8 @@ Display a summary table of all collected values:
 Component onboarding details collected:
 
   product_context              : <value>
+  slack_team_handle            : <value>
+  slack_team_channel           : <value or N/A>
   build_type / architectures   : <value>
   odh_release_tag              : <value or N/A>   # only shown for ODH Release
   target_rhoai_version         : <value or N/A>   # ODH (Jira sprint) and RHOAI
@@ -432,7 +487,9 @@ YAML_ARGS=(
   --repo-branch "$repo_branch"
   --context-path "$context_path"
   --dockerfile-path "$dockerfile_path"
+  --slack-team-handle "$slack_team_handle"
 )
+[[ -n "${slack_team_channel:-}" ]] && YAML_ARGS+=(--slack-team-channel "$slack_team_channel")
 
 # ODH-only
 if [[ "$product_context" == "ODH" ]]; then
@@ -711,6 +768,7 @@ Print:
 Done.
 
   component_onboarding_details.yaml  — generated and validated
+  Slack team                         — @<slack_team_handle> (<slack_team_channel or "no channel">)
   Jira                               — <JIRA_ID> (<JIRA_URL>)
                                        (created from template <TEMPLATE_ID>, or provided by user)
   Parent feature link                — <PARENT_FEATURE_ID> (relates to)
