@@ -244,7 +244,7 @@ YAML_EOF
   [[ ! -f "$AUTOMATION_FILE" ]] && {
     echo "ERROR: automation/resources.yaml not found. Sprint onboarding may be incomplete." >&2; exit 1
   }
-  if ! grep -q "name: pull-request-pipelines-${COMPONENT_NAME}" "$AUTOMATION_FILE" 2>/dev/null; then
+  if ! grep -q "name: pr-pipelines-${COMPONENT_NAME}" "$AUTOMATION_FILE" 2>/dev/null; then
     AUTOMATION_YAML=$(cat <<EOF
 ---
 apiVersion: appstudio.redhat.com/v1alpha1
@@ -253,10 +253,10 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
-  name: pull-request-pipelines-${COMPONENT_NAME}
+  name: pr-pipelines-${COMPONENT_NAME}
 spec:
   application: automation
-  componentName: pull-request-pipelines-${COMPONENT_NAME}
+  componentName: pr-pipelines-${COMPONENT_NAME}
   containerImage: quay.io/rhoai/pull-request-pipelines
   source:
     git:
@@ -269,7 +269,7 @@ EOF
       "$AUTOMATION_FILE" --yaml-string "$AUTOMATION_YAML" || {
       echo "ERROR: Could not append to automation/resources.yaml." >&2; exit 1
     }
-    grep -q "name: pull-request-pipelines-${COMPONENT_NAME}" "$AUTOMATION_FILE" || {
+    grep -q "name: pr-pipelines-${COMPONENT_NAME}" "$AUTOMATION_FILE" || {
       echo "ERROR: Entry not found in automation/resources.yaml after append." >&2; exit 1
     }
   fi

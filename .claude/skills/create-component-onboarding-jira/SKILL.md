@@ -241,11 +241,11 @@ Transform the validated input to the canonical form and store in `target_rhoai_v
 > (e.g. odh-my-component — not odh-my-component-v2 or odh-my-component-3-4)
 
 → Store in `component_name`.
-  Validate: must match `^odh-[a-z0-9]+(-[a-z0-9]+)*$`, must be at most 51 characters, and must not end with `-rhel9` or a version-like suffix (`-v<digits>`, `-<digits>-<digits>`, `-v<digits>-<digits>`, or `-v<digits>-<digits>-ea-<digits>`). Re-ask if invalid, showing the rule:
+  Validate: must match `^odh-[a-z0-9]+(-[a-z0-9]+)*$`, must be at most 50 characters, and must not end with `-rhel9` or a version-like suffix (`-v<digits>`, `-<digits>-<digits>`, `-v<digits>-<digits>`, or `-v<digits>-<digits>-ea-<digits>`). Re-ask if invalid, showing the rule:
   - Must start with `odh-`
   - Remaining characters: lowercase letters, numbers, and hyphens only
   - No consecutive or trailing hyphens
-  - At most 51 characters
+  - At most 50 characters
   - Must not end with `-rhel9`
   - Must not end with a version-like suffix (e.g. `-v2`, `-3-4`, `-v3-4`, `-v3-5-ea-1`)
 

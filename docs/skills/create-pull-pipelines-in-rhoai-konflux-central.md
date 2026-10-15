@@ -21,6 +21,11 @@ pipelineruns/<repo-name>/.tekton/<component-name>-pull-request.yaml
 The PipelineRun YAML configures the pull-request event trigger and references the
 same source repo and Dockerfile as the push pipeline.
 
+Its `appstudio.openshift.io/component` label uses `pr-pipelines-<component_name>`,
+matching the RHOAI automation Component registered during the KRD step. The
+onboarding schema limits `component_name` to 50 characters so this label stays
+within Kubernetes' 63-character label-value limit.
+
 ## PR raised
 
 | Field | Value |

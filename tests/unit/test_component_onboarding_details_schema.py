@@ -125,11 +125,41 @@ class TestComponentNameKeepsMainConstraints:
         errors = _errors_for("odh-dashboard-rhel9")
         assert errors, "expected odh-dashboard-rhel9 to fail schema validation"
 
-    def test_still_enforces_max_length(self):
-        too_long = "odh-" + ("a" * 48)
-        assert len(too_long) == 52
+    def test_accepts_name_at_max_length(self):
+        at_limit = "odh-" + ("a" * 46)
+        assert len(at_limit) == 50
+        Draft202012Validator(_schema()).validate(_odh_payload(at_limit))
+
+    @pytest.mark.parametrize("length", [51, 52])
+    def test_rejects_names_over_max_length(self, length: int):
+        too_long = "odh-" + ("a" * (length - 4))
+        assert len(too_long) == length
         errors = _errors_for(too_long)
-        assert errors, "expected names longer than 51 characters to fail schema validation"
+        assert errors, f"expected {length}-character names to fail schema validation"
+
+
+class TestRhoaiPullRequestComponentLabel:
+    def test_max_component_name_fits_shortened_label_prefix(self):
+        component_name = "odh-" + ("a" * 46)
+        assert len(component_name) == 50
+
+        label = f"pr-pipelines-{component_name}"
+        assert len(label) == 63
+
+    def test_pipeline_label_matches_registered_component_name(self):
+        create_pipeline_script = (
+            REPO_ROOT / "scripts" / "run_step_create_pull_pipelines.sh"
+        ).read_text(encoding="utf-8")
+        krd_script = (REPO_ROOT / "scripts" / "run_step_krd.sh").read_text(
+            encoding="utf-8"
+        )
+
+        assert (
+            "appstudio.openshift.io/component: pr-pipelines-${COMPONENT_NAME}"
+            in create_pipeline_script
+        )
+        assert "name: pr-pipelines-${COMPONENT_NAME}" in krd_script
+        assert "componentName: pr-pipelines-${COMPONENT_NAME}" in krd_script
 
 
 class TestValidateYamlSchemaCli:
