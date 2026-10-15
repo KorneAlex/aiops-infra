@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Wrapper for the setup-auto-merge step (RHOAI only).
 #
-# Updates four files in rhods-devops-infra (upstream-source-map.yaml,
-# main-release-source-map.yaml, upstream-auto-merge.yaml,
-# main-release-auto-merge.yaml) and raises a GitHub PR.
+# Updates five files in rhods-devops-infra (upstream-source-map.yaml,
+# main-release-source-map.yaml, main-stable-source-map.yaml,
+# upstream-auto-merge.yaml, main-release-auto-merge.yaml) and raises a GitHub PR.
 #
 # Exit codes:
 #   0  PR raised — prints PR_URL=<url>; writes pipeline_state.json
@@ -76,16 +76,18 @@ fetch_file_content() {
 
 USM_CONTENT=$(fetch_file_content "src/config/upstream-source-map.yaml" 2>/dev/null || echo "")
 MRSM_CONTENT=$(fetch_file_content "src/config/main-release-source-map.yaml" 2>/dev/null || echo "")
+MSSM_CONTENT=$(fetch_file_content "src/config/main-stable-source-map.yaml" 2>/dev/null || echo "")
 
-USM_HAS_ENTRY=false; MRSM_HAS_ENTRY=false
+USM_HAS_ENTRY=false; MRSM_HAS_ENTRY=false; MSSM_HAS_ENTRY=false
 [[ -n "$USM_CONTENT" ]]  && echo "$USM_CONTENT"  | grep -qF "name: ${REPO_NAME}" && USM_HAS_ENTRY=true
 [[ -n "$MRSM_CONTENT" ]] && echo "$MRSM_CONTENT" | grep -qF "name: ${REPO_NAME}" && MRSM_HAS_ENTRY=true
+[[ -n "$MSSM_CONTENT" ]] && echo "$MSSM_CONTENT" | grep -qF "name: ${REPO_NAME}" && MSSM_HAS_ENTRY=true
 
-if [[ "$USM_HAS_ENTRY" == "true" && "$MRSM_HAS_ENTRY" == "true" ]]; then
-  echo "Auto-merge entries for '${REPO_NAME}' already exist in both config files."
+if [[ "$USM_HAS_ENTRY" == "true" && "$MRSM_HAS_ENTRY" == "true" && "$MSSM_HAS_ENTRY" == "true" ]]; then
+  echo "Auto-merge entries for '${REPO_NAME}' already exist in all three config files."
   uv run --script "$SCRIPTS_DIR/update_jira_issue.py" "$JIRA_URL" \
     --add-label "auto-merge-setup-done" \
-    --comment "Auto-merge config for '${REPO_NAME}' already exists in ${RDI_PATH} (both source maps). No action needed." || true
+    --comment "Auto-merge config for '${REPO_NAME}' already exists in ${RDI_PATH} (upstream, main-release, and main-stable source maps). No action needed." || true
   bash "$SCRIPTS_DIR/update_pipeline_state.sh" \
     --state "$PIPELINE_STATE" --step auto_merge --status done
   exit 2
@@ -138,6 +140,20 @@ EOF
   }
 fi
 
+# Edit main-stable-source-map.yaml (main → stable PR creator; mirrors main-release entry)
+MSSM_FILE="$CLONE_DIR/src/config/main-stable-source-map.yaml"
+[[ ! -f "$MSSM_FILE" ]] && { echo "ERROR: src/config/main-stable-source-map.yaml not found." >&2; exit 1; }
+if ! grep -qF "name: ${REPO_NAME}" "$MSSM_FILE"; then
+  cat >> "$MSSM_FILE" <<EOF
+ - name: ${REPO_NAME}
+   automerge: 'yes'
+   repo-url: ${REPO_URL}.git
+EOF
+  grep -qF "name: ${REPO_NAME}" "$MSSM_FILE" || {
+    echo "ERROR: Verification failed for main-stable-source-map.yaml." >&2; exit 1
+  }
+fi
+
 # Edit upstream-auto-merge.yaml (add to repositories options list)
 add_to_workflow_options() {
   local file="$1" entry="$2"
@@ -167,10 +183,10 @@ add_to_workflow_options "$MRAM_FILE" "$REPO_NAME"
 # Commit and push
 bash "$SCRIPTS_DIR/git_commit_push.sh" \
   --clone-dir "$CLONE_DIR" \
-  --files     "src/config/upstream-source-map.yaml src/config/main-release-source-map.yaml .github/workflows/upstream-auto-merge.yaml .github/workflows/main-release-auto-merge.yaml" \
+  --files     "src/config/upstream-source-map.yaml src/config/main-release-source-map.yaml src/config/main-stable-source-map.yaml .github/workflows/upstream-auto-merge.yaml .github/workflows/main-release-auto-merge.yaml" \
   --message   "Configure auto-merge for ${REPO_NAME}
 
-Adds '${REPO_NAME}' to upstream and main-release source maps
+Adds '${REPO_NAME}' to upstream, main-release, and main-stable source maps
 and registers it in both auto-merge workflows.
 
 Related: ${JIRA_ID}" \
@@ -196,6 +212,7 @@ for attempt in 1 2 3; do
 **Files changed:**
 - \`src/config/upstream-source-map.yaml\`
 - \`src/config/main-release-source-map.yaml\`
+- \`src/config/main-stable-source-map.yaml\`
 - \`.github/workflows/upstream-auto-merge.yaml\`
 - \`.github/workflows/main-release-auto-merge.yaml\`
 
