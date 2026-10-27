@@ -140,29 +140,7 @@ Re-ask if the answer is invalid (explain why and show valid options).
 
 → Store in `product_context`. Must be exactly `ODH` or `RHOAI` (case-insensitive input, store uppercase).
 
-**Q1.5 — Team Slack handle (always, both products)**
-
-> Which team is responsible for this component? Give me their Slack user-group handle
-> (e.g. `ai-core-platform`) — published to `team-slack-handles.yaml` in the private
-> `rhods-devops-infra` repo so guardians can find the right team. See RHOAIENG-85559.
-
-→ Normalize: strip leading `@`, lowercase. Validate `^[a-z0-9]+(-[a-z0-9]+)*$`; re-ask if invalid.
-
-Best-effort cross-check against handles already in `team-slack-handles.yaml` (the script
-prints JSON and exits non-zero for any non-`found` status — parse the JSON, don't treat
-non-zero as fatal). This does not contact Slack:
-
-```bash
-uv run --script scripts/lookup_slack_target.py lookup-usergroup --handle "$slack_team_handle"
-```
-
-- `found` → proceed silently.
-- `unknown`/`error` → handle is not in the existing routing file (normal for a new team);
-  confirm with the user: "Can't verify `@<handle>` against existing routing — is it
-  correct? (yes/no)". `no` → re-ask Q1.5.
-- `invalid` → re-ask Q1.5.
-
-→ Store in `slack_team_handle`.
+**Q1.5 — Team Slack handle (both products)** — user-group handle (e.g. `ai-core-platform`) for `team-slack-handles.yaml` (RHOAIENG-85559). Strip `@`, lowercase; validate `^[a-z0-9]+(-[a-z0-9]+)*$`. Optional: `lookup_slack_target.py lookup-usergroup --handle "$slack_team_handle"` — parse JSON even on non-zero exit (`found` OK; `unknown`/`error` confirm with user; `invalid` re-ask). Store in `slack_team_handle`.
 
 **Q1.6 — Optional Slack channel (always, both products)**
 
@@ -173,13 +151,9 @@ uv run --script scripts/lookup_slack_target.py lookup-usergroup --handle "$slack
 
 → Store in `slack_team_channel` when provided.
 
-**Q2 — Product-context-specific question**
+**Q2 — ODH Release (ODH only)** — CI is always onboarded (`build_type: CI`); do not ask "CI or Release".
 
-_If `product_context == ODH`:_
-
-Always onboard **CI** (`build_type` is always `CI` in the YAML). Do **not** ask "CI or Release".
-
-**Q2 — Also onboard ODH Release? (ODH only)**
+**Q2a — Also onboard ODH Release?**
 
 > Do you also need ODH Release onboarding for this component?
 > (yes / no)
@@ -575,20 +549,7 @@ uv run --script scripts/check_dockerfile_digests.py \
 DIGEST_EXIT=$?
 ```
 
-**If exit 2** (Dockerfile not reachable — branch or file may not exist yet): stop with:
-```
-ERROR in Step 6b (Dockerfile digest check): Could not fetch Dockerfile at $DOCKERFILE_RAW_URL (HTTP 404 or unreachable).
-Verify that the repo_url, repo_branch, context_path, and dockerfile_path are correct and that the Dockerfile exists at that location.
-```
-
-**If exit 1** (violations found): display the stderr output, then stop with:
-```
-ERROR in Step 6b (Dockerfile digest check): The Dockerfile contains FROM instructions that do not use @sha256 digests (see above).
-All base and builder images must be pinned with @sha256 digests before onboarding can proceed.
-Please update the Dockerfile and re-run this skill.
-```
-
-**If exit 0**: print `Dockerfile digest check passed.`
+**Exit codes:** `2` → stop (Dockerfile URL unreachable; fix repo/branch/path). `1` → stop (unpinned `FROM`; show stderr). `0` → print `Dockerfile digest check passed.`
 
 ---
 
@@ -638,20 +599,12 @@ uv run --script scripts/update_jira_issue.py "$JIRA_URL" \
   --add-label "yaml-attached" \
   --link-related "$PARENT_FEATURE_ID" \
   --link-clones "$TEMPLATE_ID" \
-  --comment "component_onboarding_details.yaml has been generated and attached to this ticket.
-
-Component: <component_name>
-Product: <product_context>
-Repo: <repo_url> @ <repo_branch>
-Operator: <is_operator>
-
-This ticket is ready for onboarding automation. The DevOps onboarding guardian will review it next, after which the pipeline can run. Run /validate-component-onboarding-jira to verify."
+  --comment "<ATTACH_COMMENT>"
 ```
 
-On exit 1: display stderr and stop with:
-```
-ERROR in Step 7 (Upload attachment): Could not attach YAML to Jira. See details above. Aborting.
-```
+Use the same `--comment` body in Step 7b-2 (`ATTACH_COMMENT`: component, product, repo @ branch, operator; ready for guardian review; run `/validate-component-onboarding-jira`).
+
+On attach exit 1: stop with `ERROR in Step 7: Could not attach YAML. See stderr.`
 
 Continue to Step 7c.
 
@@ -699,20 +652,10 @@ echo "New Jira created: $NEW_JIRA_URL"
 uv run --script scripts/update_jira_issue.py "$JIRA_URL" \
   --attach "$YAML_PATH" \
   --add-label "yaml-attached" \
-  --comment "component_onboarding_details.yaml has been generated and attached to this ticket.
-
-Component: <component_name>
-Product: <product_context>
-Repo: <repo_url> @ <repo_branch>
-Operator: <is_operator>
-
-This ticket is ready for onboarding automation. The DevOps onboarding guardian will review it next, after which the pipeline can run. Run /validate-component-onboarding-jira to verify."
+  --comment "<ATTACH_COMMENT>"
 ```
 
-On exit 1: display stderr and stop with:
-```
-ERROR in Step 7b-2 (Upload attachment): Could not attach YAML to new Jira. See details above. Aborting.
-```
+On exit 1: stop with `ERROR in Step 7b-2: Could not attach YAML. See stderr.`
 
 Continue to Step 7c.
 
@@ -785,18 +728,4 @@ If `TEMPLATE_ID` was not used (i.e. the user provided a Jira URL directly), omit
 
 ## Error reference
 
-| Error | Step | Action |
-|-------|------|--------|
-| Invalid Jira URL format | 0 | Correct the URL and re-run |
-| `JIRA_USER_EMAIL` / `JIRA_API_TOKEN` not set | 0 | Export the env vars |
-| `uv` not installed | 0 | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| `jq` not installed | 2 | `brew install jq` or `sudo dnf install jq` |
-| Jira fetch fails (401/403/404) | 2 | Check credentials and issue key |
-| Repository not found / not accessible (non-200 HTTP) | Q4-check | Create the GitHub repository first, then re-run |
-| YAML generation fails | 5 | Check arguments; see stderr from `generate_onboarding_yaml.py` |
-| YAML validation fails | 6 | Correct the inputs and re-generate |
-| Dockerfile digest violations found | 6b | Pin all FROM images with @sha256 digests, then re-run |
-| Clone fails (ODH: `RHOAIENG-35683`, RHOAI: `RHOAIENG-17225`) | 7b-1 | Check `JIRA_USER_EMAIL` / `JIRA_API_TOKEN`; verify create permission |
-| "relates to" link type not found | 7-pre, 7b-1 | Check available link types with a Jira admin |
-| Attach/upload fails | 7, 7b-2 | Check credentials; re-run the skill |
-| Metadata update fails | 7c | Warnings printed; update title/description/label manually in Jira |
+See `docs/skills/create-component-onboarding-jira.md` for the full error table. Common blockers: missing Jira env vars (Step 0), invalid URL (Step 0), repo 404 (Q4), schema validation (Step 6), digest pins (Step 6b), template clone/attach (Step 7).

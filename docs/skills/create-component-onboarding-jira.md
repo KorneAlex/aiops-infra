@@ -64,5 +64,19 @@ value as given. A ticket for an older release, such as `3.5`, writes
 with the current development application means entering the current development
 version here.
 
+## Error reference
+
+| Error | Step | Action |
+|-------|------|--------|
+| Invalid Jira URL format | 0 | Correct the URL and re-run |
+| `JIRA_USER_EMAIL` / `JIRA_API_TOKEN` not set | 0 | Export the env vars |
+| `uv` / `jq` not installed | 0–2 | Install per skill prerequisites |
+| Jira fetch fails (401/403/404) | 2 | Check credentials and issue key |
+| Repository not found (non-200 HTTP) | Q4-check | Create the GitHub repo first |
+| YAML generation / validation fails | 5–6 | Fix inputs; see script stderr |
+| Dockerfile digest violations | 6b | Pin all `FROM` with `@sha256` (RHOAI) |
+| Template clone / attach fails | 7, 7b | Check Jira permissions and credentials |
+| Metadata update fails | 7c | Warning only — fix title/description in Jira manually |
+
 See also: [validate-component-onboarding-jira](validate-component-onboarding-jira.md),
 [create-pull-pipelines-in-rhoai-konflux-central](create-pull-pipelines-in-rhoai-konflux-central.md)
