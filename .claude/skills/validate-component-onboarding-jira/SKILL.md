@@ -24,6 +24,8 @@ Any failure is a hard blocker. The skill exits with a clear error message.
 - `JIRA_API_TOKEN` environment variable must be set with an Atlassian Cloud API token
   - Create at: https://id.atlassian.com/manage-profile/security/api-tokens
   - Set: `export JIRA_API_TOKEN='your-api-token-here'`
+- `GITHUB_TOKEN` is required when validating components in private GitHub repositories
+  - The token must have read access to the component repository
 - Optional: `JIRA_SERVER` (default: `https://redhat.atlassian.net`)
 
 
@@ -240,7 +242,8 @@ Could not fetch the Dockerfile at:
   $DOCKERFILE_RAW_URL
 
 Ensure the repo_url, repo_branch, context_path, and dockerfile_path in the YAML are correct
-and that the Dockerfile exists on the specified branch."
+and that the Dockerfile exists on the specified branch. For private repositories, ensure
+GITHUB_TOKEN is set and has read access to the repository."
 ```
 
 Then stop with: `ERROR in Step 5c (Dockerfile Digest Check): Could not fetch Dockerfile. Aborting.`
@@ -328,6 +331,6 @@ Output files are in: ./<issue_id>/
 | Attachment not found | Script 2 exits 1; display its stderr (includes list of available attachments) |
 | YAML fails schema | Script 3 exits 1; display all field-level errors from stderr |
 | `repo_branch` / `target_rhoai_version` mismatch | Step 5b; correct the YAML and re-upload |
-| Dockerfile not reachable (exit 2) | Step 5c; check repo_url, repo_branch, context_path, dockerfile_path |
+| Dockerfile not reachable (exit 2) | Step 5c; check repo_url, repo_branch, context_path, dockerfile_path, and `GITHUB_TOKEN` access for private repositories |
 | FROM instructions missing `@sha256` digest (exit 1) | Step 5c; update Dockerfile to pin all images with SHA digests |
 | uv not installed | "uv is not installed. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh" |

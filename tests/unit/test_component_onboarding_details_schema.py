@@ -29,6 +29,7 @@ def _odh_payload(component_name: str) -> dict:
             "dockerfile_path": "Dockerfile",
             "is_operator": False,
             "build_type": "CI",
+            "slack_team_handle": "openshift-ai-devtestops-ic",
         }
     }
 
@@ -58,6 +59,32 @@ def _run_validate_cli(tmp_path: Path, component_name: str) -> subprocess.Complet
         text=True,
         check=False,
     )
+
+
+class TestSlackTeamHandleOptional:
+    """slack_team_handle/slack_team_channel must NOT be required — many components
+    were already onboarded/in-flight before RHOAIENG-85559 added these fields, and
+    their pipeline_state.json 'validate' step is already marked done and never
+    re-validated, but any *not-yet-validated* older YAML must still pass here."""
+
+    def test_accepts_payload_without_slack_team_handle(self):
+        payload = _odh_payload("odh-dashboard")
+        del payload["inputs"]["slack_team_handle"]
+        validator = Draft202012Validator(_schema())
+        validator.validate(payload)  # must not raise
+
+    def test_accepts_payload_with_slack_team_handle_and_channel(self):
+        payload = _odh_payload("odh-dashboard")
+        payload["inputs"]["slack_team_channel"] = "forum-openshift-ai-operator"
+        validator = Draft202012Validator(_schema())
+        validator.validate(payload)  # must not raise
+
+    def test_rejects_invalid_slack_team_handle_format_when_present(self):
+        payload = _odh_payload("odh-dashboard")
+        payload["inputs"]["slack_team_handle"] = "Not A Handle"
+        validator = Draft202012Validator(_schema())
+        with pytest.raises(Exception):
+            validator.validate(payload)
 
 
 class TestComponentNameAccepted:
@@ -98,11 +125,56 @@ class TestComponentNameKeepsMainConstraints:
         errors = _errors_for("odh-dashboard-rhel9")
         assert errors, "expected odh-dashboard-rhel9 to fail schema validation"
 
-    def test_still_enforces_max_length(self):
-        too_long = "odh-" + ("a" * 48)
-        assert len(too_long) == 52
+    def test_accepts_name_at_max_length(self):
+        at_limit = "odh-" + ("a" * 46)
+        assert len(at_limit) == 50
+        Draft202012Validator(_schema()).validate(_odh_payload(at_limit))
+
+    @pytest.mark.parametrize("length", [51, 52])
+    def test_rejects_names_over_max_length(self, length: int):
+        too_long = "odh-" + ("a" * (length - 4))
+        assert len(too_long) == length
         errors = _errors_for(too_long)
-        assert errors, "expected names longer than 51 characters to fail schema validation"
+        assert errors, f"expected {length}-character names to fail schema validation"
+
+
+class TestRhoaiPullRequestComponentLabel:
+    def test_max_component_name_fits_krd_pr_pipelines_label(self):
+        component_name = "odh-" + ("a" * 46)
+        assert len(component_name) == 50
+
+        # KRD still registers pr-pipelines-<component>. That prefix, not the
+        # versioned pull-pipeline label, is what the 50-character cap protects.
+        label = f"pr-pipelines-{component_name}"
+        assert len(label) == 63
+
+    def test_pull_pipeline_uses_versioned_development_identity(self):
+        create_pipeline_script = (
+            REPO_ROOT / "scripts" / "run_step_create_pull_pipelines.sh"
+        ).read_text(encoding="utf-8")
+
+        assert (
+            "appstudio.openshift.io/application: rhoai-${VERSION_VAR}"
+            in create_pipeline_script
+        )
+        assert (
+            "appstudio.openshift.io/component: ${COMPONENT_NAME}-${VERSION_VAR}"
+            in create_pipeline_script
+        )
+        assert (
+            "serviceAccountName: build-pipeline-${COMPONENT_NAME}-${VERSION_VAR}"
+            in create_pipeline_script
+        )
+        assert "pr-pipelines-${COMPONENT_NAME}" not in create_pipeline_script
+        assert "build-pipeline-pull-request-pipelines" not in create_pipeline_script
+
+    def test_krd_still_registers_pr_pipelines_component(self):
+        krd_script = (REPO_ROOT / "scripts" / "run_step_krd.sh").read_text(
+            encoding="utf-8"
+        )
+
+        assert "name: pr-pipelines-${COMPONENT_NAME}" in krd_script
+        assert "componentName: pr-pipelines-${COMPONENT_NAME}" in krd_script
 
 
 class TestOdhCiPlusRelease:

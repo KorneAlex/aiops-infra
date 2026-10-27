@@ -140,6 +140,39 @@ Re-ask if the answer is invalid (explain why and show valid options).
 
 → Store in `product_context`. Must be exactly `ODH` or `RHOAI` (case-insensitive input, store uppercase).
 
+**Q1.5 — Team Slack handle (always, both products)**
+
+> Which team is responsible for this component? Give me their Slack user-group handle
+> (e.g. `ai-core-platform`) — published to `team-slack-handles.yaml` in the private
+> `rhods-devops-infra` repo so guardians can find the right team. See RHOAIENG-85559.
+
+→ Normalize: strip leading `@`, lowercase. Validate `^[a-z0-9]+(-[a-z0-9]+)*$`; re-ask if invalid.
+
+Best-effort cross-check against handles already in `team-slack-handles.yaml` (the script
+prints JSON and exits non-zero for any non-`found` status — parse the JSON, don't treat
+non-zero as fatal). This does not contact Slack:
+
+```bash
+uv run --script scripts/lookup_slack_target.py lookup-usergroup --handle "$slack_team_handle"
+```
+
+- `found` → proceed silently.
+- `unknown`/`error` → handle is not in the existing routing file (normal for a new team);
+  confirm with the user: "Can't verify `@<handle>` against existing routing — is it
+  correct? (yes/no)". `no` → re-ask Q1.5.
+- `invalid` → re-ask Q1.5.
+
+→ Store in `slack_team_handle`.
+
+**Q1.6 — Optional Slack channel (always, both products)**
+
+> Also record a specific Slack channel for this component? (optional — Enter to skip)
+
+- Empty → leave `slack_team_channel` unset. Non-empty → strip leading `#`, lowercase.
+  Validate `^[a-z0-9]+(-[a-z0-9]+)*$`; re-ask if invalid.
+
+→ Store in `slack_team_channel` when provided.
+
 **Q2 — Product-context-specific question**
 
 _If `product_context == ODH`:_
@@ -193,15 +226,17 @@ _If `product_context == RHOAI`:_
 **Q2a — Target RHOAI version**
 > What is the target RHOAI version?
 > Format: `x.y`, `x.y.0`, `x.y-eaN`, `x.y-ea-N`, `x.y-ea.N`, `x.y.0-eaN`, `x.y.0-ea-N`, or `x.y.0-ea.N`
-> Examples: `3.4`, `3.4.0`, `3.4-ea2`, `3.4-ea-2`, `3.4-ea.2`, `3.4.0-ea2`, `3.4.0-ea-2`, `3.4.0-ea.2`
+> Examples: `3.6`, `3.6.0`, `3.6-ea1`, `3.6-ea-1`, `3.6-ea.1`, `3.6.0-ea1`, `3.6.0-ea-1`, `3.6.0-ea.1`
+>
+> This value is parsed into the release branch and into the main-branch pull-request PipelineRun (`rhoai-vX-Y`, `<component>-vX-Y`, `build-pipeline-<component>-vX-Y`, `rhoai-version`). Enter the current development version when that pull-request PipelineRun should use the current development application. An older release target keeps the older version's identifiers on the main-branch file.
 
 → Validate against the regex: `^\d+\.\d+(?:\.0)?(?:-ea[-.]?\d+)?$`
   Re-ask if the input does not match, showing the valid examples above.
 
 Transform the validated input to the canonical form and store in `target_rhoai_version`:
 - Extract `VERSION_X` = first integer, `VERSION_Y` = second integer, `VERSION_N` = EA number (after `-ea`, `-ea-`, or `-ea.`), or empty if no EA suffix
-- If `VERSION_N` is non-empty: `target_rhoai_version = "<VERSION_X>.<VERSION_Y>-ea-<VERSION_N>"` (e.g. `3.4-ea-2`)
-- Otherwise: `target_rhoai_version = "<VERSION_X>.<VERSION_Y>"` (e.g. `3.4`)
+- If `VERSION_N` is non-empty: `target_rhoai_version = "<VERSION_X>.<VERSION_Y>-ea-<VERSION_N>"` (e.g. `3.6-ea-1`)
+- Otherwise: `target_rhoai_version = "<VERSION_X>.<VERSION_Y>"` (e.g. `3.6`)
 
 **Q2b — CPU architectures**
 > Which CPU architectures should this component build for?
@@ -219,11 +254,11 @@ Transform the validated input to the canonical form and store in `target_rhoai_v
 > (e.g. odh-my-component — not odh-my-component-v2 or odh-my-component-3-4)
 
 → Store in `component_name`.
-  Validate: must match `^odh-[a-z0-9]+(-[a-z0-9]+)*$`, must be at most 51 characters, and must not end with `-rhel9` or a version-like suffix (`-v<digits>`, `-<digits>-<digits>`, `-v<digits>-<digits>`, or `-v<digits>-<digits>-ea-<digits>`). Re-ask if invalid, showing the rule:
+  Validate: must match `^odh-[a-z0-9]+(-[a-z0-9]+)*$`, must be at most 50 characters, and must not end with `-rhel9` or a version-like suffix (`-v<digits>`, `-<digits>-<digits>`, `-v<digits>-<digits>`, or `-v<digits>-<digits>-ea-<digits>`). Re-ask if invalid, showing the rule:
   - Must start with `odh-`
   - Remaining characters: lowercase letters, numbers, and hyphens only
   - No consecutive or trailing hyphens
-  - At most 51 characters
+  - At most 50 characters
   - Must not end with `-rhel9`
   - Must not end with a version-like suffix (e.g. `-v2`, `-3-4`, `-v3-4`, `-v3-5-ea-1`)
 
@@ -405,6 +440,8 @@ Display a summary table of all collected values:
 Component onboarding details collected:
 
   product_context              : <value>
+  slack_team_handle            : <value>
+  slack_team_channel           : <value or N/A>
   build_type (ODH: always CI)  : CI
   odh_release_tag              : <value or N/A>   # ODH when also onboarding Release
   odh_release_branch           : <value or N/A>   # ODH Release branch (default stable)
@@ -445,7 +482,9 @@ YAML_ARGS=(
   --repo-branch "$repo_branch"
   --context-path "$context_path"
   --dockerfile-path "$dockerfile_path"
+  --slack-team-handle "$slack_team_handle"
 )
+[[ -n "${slack_team_channel:-}" ]] && YAML_ARGS+=(--slack-team-channel "$slack_team_channel")
 
 # ODH-only — CI is always onboarded; Release is optional via odh_release_tag
 if [[ "$product_context" == "ODH" ]]; then
@@ -727,6 +766,7 @@ Print:
 Done.
 
   component_onboarding_details.yaml  — generated and validated
+  Slack team                         — @<slack_team_handle> (<slack_team_channel or "no channel">)
   Jira                               — <JIRA_ID> (<JIRA_URL>)
                                        (created from template <TEMPLATE_ID>, or provided by user)
   Parent feature link                — <PARENT_FEATURE_ID> (relates to)

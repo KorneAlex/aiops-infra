@@ -21,15 +21,22 @@ Exit 2  — Dockerfile could not be fetched/read
 """
 
 import argparse
+import os
 import re
 import sys
+import urllib.parse
 import urllib.request
 
 
 def fetch(source: str) -> str:
     try:
         if source.startswith("http://") or source.startswith("https://"):
-            with urllib.request.urlopen(source) as resp:
+            request = urllib.request.Request(source)
+            token = os.environ.get("GITHUB_TOKEN")
+            parsed = urllib.parse.urlparse(source)
+            if token and parsed.scheme == "https" and parsed.hostname == "raw.githubusercontent.com":
+                request.add_unredirected_header("Authorization", f"Bearer {token}")
+            with urllib.request.urlopen(request) as resp:
                 return resp.read().decode()
         else:
             with open(source) as f:

@@ -14,6 +14,7 @@ Orchestrates the complete component onboarding pipeline (idempotent re-run model
 
 1. `validate-component-onboarding-jira` — fetch + validate Jira YAML
 2. `create-quay-repo` — GitLab MR to app-interface
+2b. `record-team-slack-handle` (`slack_handle`) — GitHub PR to rhods-devops-infra, publishing the component's team Slack handle to `team-slack-handles.yaml` **(both ODH and RHOAI; no dependencies, runs alongside quay — see RHOAIENG-85559)**
 3. `create-rhoai-delivery-repo` — GitLab MR to pyxis-repo-configs **(RHOAI only; prerequisite of krd)**
 4. `onboard-component-to-konflux-release-data` — GitLab MR to konflux-release-data **(after quay merges; also after delivery-repo for RHOAI)**
 5. `add-component-to-odh-konflux-central` **(ODH)** / `add-component-to-rhoai-konflux-central` + `create-pull-pipelines-in-rhoai-konflux-central` **(RHOAI; after krd merges)**
@@ -330,6 +331,20 @@ EXIT_CODE=$?
 
 Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
 
+### Step 8a2: record-team-slack-handle (step key: `slack_handle`)
+
+**Execute if** `slack_handle` is in `UNBLOCKED_STEPS`.
+
+Applies to **both** ODH and RHOAI — every component records its team's Slack handle
+regardless of product context (see RHOAIENG-85559).
+
+```bash
+OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_slack_handle.sh" --jira-url "$JIRA_URL")
+EXIT_CODE=$?
+```
+
+Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
+
 ### Step 8b: create-rhoai-delivery-repo (step key: `delivery_repo`, RHOAI only)
 
 **Execute if** `delivery_repo` is in `UNBLOCKED_STEPS` and `PRODUCT_CONTEXT == "RHOAI"`.
@@ -382,6 +397,10 @@ Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
 OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_create_pull_pipelines.sh" --jira-url "$JIRA_URL")
 EXIT_CODE=$?
 ```
+
+Writes `pipelineruns/<repo-name>/.tekton/<component-name>-pull-request.yaml` and opens the PR against `konflux-central` `main`.
+
+Versioned fields come from `target_rhoai_version` through `parse_rhoai_version.sh`. For `3.6` the PipelineRun uses application `rhoai-v3-6`, component `<component>-v3-6`, service account `build-pipeline-<component>-v3-6`, image `quay.io/rhoai/<component>-rhel9:on-pr-{{pull_request_number}}`, retention `30d`, and an on-CEL pull-request trigger. An older `target_rhoai_version` such as `3.5` keeps that older version's identifiers (`rhoai-v3-5`). Details and the pipeline-reference CEL are in `docs/skills/create-pull-pipelines-in-rhoai-konflux-central.md`.
 
 Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
 
@@ -631,6 +650,7 @@ bash "$SCRIPTS_DIR/raise_jira_review.sh" \
 
 PRs / MRs:
   quay            : <steps.quay.status> — <steps.quay.mr_url or "not yet raised">
+  slack_handle    : <steps.slack_handle.status> — <steps.slack_handle.pr_url or "not yet raised">
   krd             : <steps.krd.status> — <steps.krd.mr_url or "not yet raised">
   okc             : <steps.okc.status> — <steps.okc.pr_url or "not yet raised">
   pull_pipelines  : <steps.pull_pipelines.status or "N/A (ODH)">

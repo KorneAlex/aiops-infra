@@ -21,6 +21,23 @@ The PipelineRun YAML configures:
 - Source repo, branch, context path, and Dockerfile from `component_onboarding_details.yaml`
 - Target architectures (multi-arch build matrix)
 - Konflux push-event trigger
+- Git authentication through the Pipelines as Code secret workspace
+
+## Git authentication workspace
+
+Generated push PipelineRuns include the following binding under `spec`, matching
+the pull-request PipelineRuns:
+
+```yaml
+workspaces:
+- name: git-auth
+  secret:
+    secretName: '{{ git_auth_secret }}'
+```
+
+Pipelines as Code resolves `git_auth_secret` to the Git credentials secret for
+the run. The shared build pipeline uses this workspace for repository cloning
+and dependency prefetch.
 
 ## PR raised
 
@@ -39,4 +56,5 @@ Comment: PR URL posted to the onboarding ticket.
 
 This skill creates only the push PipelineRun. The pull-request PipelineRun is handled
 separately by [create-pull-pipelines-in-rhoai-konflux-central](create-pull-pipelines-in-rhoai-konflux-central.md),
-which targets `main` rather than the version branch.
+which opens its PR against `main`. Both files take application, component, and
+service account from the same `target_rhoai_version`.

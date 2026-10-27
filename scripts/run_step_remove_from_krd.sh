@@ -160,12 +160,17 @@ elif [[ "$PRODUCT_CONTEXT" == "RHOAI" ]]; then
     CHANGES_MADE=true
   fi
 
-  # Remove from automation/resources.yaml
+  # Remove the current and legacy PR-pipeline Component names from automation/resources.yaml.
   AUTOMATION_FILE="$CLONE_DIR/tenants-config/cluster/stone-prod-p02/tenants/rhoai-tenant/automation/resources.yaml"
-  if [[ -f "$AUTOMATION_FILE" ]] && grep -q "name: pull-request-pipelines-${COMPONENT_NAME}" "$AUTOMATION_FILE" 2>/dev/null; then
-    uv run --script "$SCRIPTS_DIR/edit_offboarding_yaml.py" remove-yaml-doc \
-      "$AUTOMATION_FILE" --name "pull-request-pipelines-${COMPONENT_NAME}" || true
-    CHANGES_MADE=true
+  if [[ -f "$AUTOMATION_FILE" ]]; then
+    for PR_COMPONENT_PREFIX in pr-pipelines pull-request-pipelines; do
+      PR_COMPONENT_NAME="${PR_COMPONENT_PREFIX}-${COMPONENT_NAME}"
+      if grep -q "name: ${PR_COMPONENT_NAME}" "$AUTOMATION_FILE" 2>/dev/null; then
+        uv run --script "$SCRIPTS_DIR/edit_offboarding_yaml.py" remove-yaml-doc \
+          "$AUTOMATION_FILE" --name "$PR_COMPONENT_NAME" || true
+        CHANGES_MADE=true
+      fi
+    done
   fi
 fi
 

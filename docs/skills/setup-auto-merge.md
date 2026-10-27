@@ -17,6 +17,7 @@ it to the auto-merge configuration in `rhods-devops-infra`.
 |------|--------|
 | `src/config/upstream-source-map.yaml` | Appends entry mapping the upstream repo to its midstream counterpart |
 | `src/config/main-release-source-map.yaml` | Appends entry for the main→release branch merge path |
+| `src/config/main-stable-source-map.yaml` | Appends matching entry for the main→stable PR creator workflow |
 | `.github/workflows/upstream-auto-merge.yaml` | Adds `<repo_name>` to the `repositories` input options list |
 | `.github/workflows/main-release-auto-merge.yaml` | Adds `<repo_name>` to the `repositories` input options list |
 
@@ -46,6 +47,18 @@ it to the auto-merge configuration in `rhods-devops-infra`.
 `ignore-files: .tekton/*` keeps Tekton/PAC pipelines local to each side of the
 mapping (ODH CI stays upstream; RHDS pull pipelines stay on `main`, not release
 branches).
+
+### main-stable-source-map.yaml entry
+
+Same `name`, `automerge`, and `repo-url` as main-release (no `ignore-files`; file
+defaults define branches and sync type). Indent list items with a leading space to
+match the existing file format.
+
+```yaml
+ - name: <repo_name>
+   automerge: 'yes'
+   repo-url: <midstream_repo_url>.git
+```
 
 ## PR raised
 
