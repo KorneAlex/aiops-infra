@@ -105,6 +105,24 @@ class TestComponentNameKeepsMainConstraints:
         assert errors, "expected names longer than 51 characters to fail schema validation"
 
 
+class TestOdhCiPlusRelease:
+    def test_ci_only_valid(self):
+        validator = Draft202012Validator(_schema())
+        validator.validate(_odh_payload("odh-dashboard"))
+
+    def test_ci_with_optional_release_tag(self):
+        payload = _odh_payload("odh-dashboard")
+        payload["inputs"]["odh_release_tag"] = "2.21.0"
+        payload["inputs"]["odh_release_branch"] = "stable"
+        Draft202012Validator(_schema()).validate(payload)
+
+    def test_legacy_release_requires_tag(self):
+        payload = _odh_payload("odh-dashboard")
+        payload["inputs"]["build_type"] = "Release"
+        errors = list(Draft202012Validator(_schema()).iter_errors(payload))
+        assert any("odh_release_tag" in e.message for e in errors)
+
+
 class TestValidateYamlSchemaCli:
     def test_cli_accepts_base_name(self, tmp_path):
         result = _run_validate_cli(tmp_path, "odh-dashboard")

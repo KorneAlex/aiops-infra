@@ -111,6 +111,21 @@ if [[ -n "$PIPELINE_STATE" && -f "$PIPELINE_STATE" ]]; then
         --state "$PIPELINE_STATE" --step "$_step" --field status --value "skipped"
     done
     echo "[parse_component_details] ODH: RHOAI-only steps marked as skipped." >&2
+
+    ODH_RELEASE_TAG=$(grep -m1 'odh_release_tag:' "$YAML_FILE" | awk '{print $2}' 2>/dev/null || true)
+    YAML_BUILD_TYPE=$(grep -m1 'build_type:' "$YAML_FILE" | awk '{print $2}' 2>/dev/null || true)
+    if [[ -z "$ODH_RELEASE_TAG" && "$YAML_BUILD_TYPE" != "Release" ]]; then
+      bash "$SCRIPTS_DIR/pipeline_state.sh" set \
+        --state "$PIPELINE_STATE" --step onboarder_release --field status --value "skipped"
+      echo "[parse_component_details] ODH: onboarder_release skipped (no odh_release_tag)." >&2
+    elif jq -e '.steps.onboarder_release' "$PIPELINE_STATE" > /dev/null 2>&1; then
+      CURRENT_OR=$(jq -r '.steps.onboarder_release.status // "pending"' "$PIPELINE_STATE")
+      if [[ "$CURRENT_OR" == "skipped" ]]; then
+        bash "$SCRIPTS_DIR/pipeline_state.sh" set \
+          --state "$PIPELINE_STATE" --step onboarder_release --field status --value "pending"
+        echo "[parse_component_details] ODH: onboarder_release enabled (release tag present)." >&2
+      fi
+    fi
   fi
 fi
 

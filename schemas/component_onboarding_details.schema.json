@@ -60,13 +60,19 @@
         },
         "build_type": {
           "type": "string",
-          "description": "Onboarding target: CI pipeline or Release pipeline (required when product_context is ODH)",
+          "description": "ODH CI onboarding baseline (always CI for new tickets). Legacy value Release is treated as CI plus Release onboarder when odh_release_tag is set.",
           "enum": ["CI", "Release"]
         },
         "odh_release_tag": {
           "type": "string",
-          "description": "Version tag for ODH Release builds (e.g. 2.21.0). Required when product_context is ODH and build_type is Release.",
+          "description": "Optional ODH Release version tag (e.g. 2.21.0). When set, the orchestrator also runs the Release onboarder workflow on the release branch.",
           "minLength": 1
+        },
+        "odh_release_branch": {
+          "type": "string",
+          "description": "Git branch for the ODH Release onboarder run (default stable when odh_release_tag is set)",
+          "minLength": 1,
+          "default": "stable"
         },
         "architectures": {
           "type": "array",

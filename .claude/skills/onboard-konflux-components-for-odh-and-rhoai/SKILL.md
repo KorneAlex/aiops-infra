@@ -17,7 +17,7 @@ Orchestrates the complete component onboarding pipeline (idempotent re-run model
 3. `create-rhoai-delivery-repo` — GitLab MR to pyxis-repo-configs **(RHOAI only; prerequisite of krd)**
 4. `onboard-component-to-konflux-release-data` — GitLab MR to konflux-release-data **(after quay merges; also after delivery-repo for RHOAI)**
 5. `add-component-to-odh-konflux-central` **(ODH)** / `add-component-to-rhoai-konflux-central` + `create-pull-pipelines-in-rhoai-konflux-central` **(RHOAI; after krd merges)**
-6. `run-odh-konflux-onboarder-workflow` — triggered once krd+okc are both merged **(ODH only)**
+6. `run-odh-konflux-onboarder-workflow` — CI onboarder once krd+okc merge; optional second Release run when `odh_release_tag` is set **(ODH only)**
 7. `integrate-component-with-bundle` — GitHub PR **(ODH: after onboarder_workflow; RHOAI: after okc merges)**
 7b. `krd-release-plan` (`krd_rpa`) — GitLab MR to ReleasePlanAdmission **(RHOAI only; after okc merges, alongside bundle)**
 8. `integrate-component-with-odh-operator` — GitHub PR **(after bundle merges; if is_operator=true)**
@@ -461,18 +461,34 @@ Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
 
 ## Step 9: Handle Workflow Triggers
 
-Workflow triggers execute once their dependencies are merged. `onboarder_workflow`
-produces a Tekton PR URL that must be tracked (record as `pr_raised`); `renovate_sync`
+Workflow triggers execute once their dependencies are merged. `onboarder_workflow` and
+`onboarder_release` each produce a Tekton PR URL tracked independently; `renovate_sync`
 completes with no URL and is marked `done` immediately.
 
-### Step 9a: run-odh-konflux-onboarder-workflow (step key: `onboarder_workflow`, ODH only)
+### Step 9a: run-odh-konflux-onboarder-workflow — CI (step key: `onboarder_workflow`, ODH only)
 
 **Execute if** `onboarder_workflow` is in `UNBLOCKED_STEPS` and `PRODUCT_CONTEXT == "ODH"`.
 
 The `depends_on: ["krd", "okc"]` check in Step 7 ensures both are merged before this runs.
+Always triggers the onboarder with `build_type=CI` on `repo_branch` from the YAML.
 
 ```bash
-OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_odh_onboarder_workflow.sh" --jira-url "$JIRA_URL")
+OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_odh_onboarder_workflow.sh" --jira-url "$JIRA_URL" --pipeline-step onboarder_workflow)
+EXIT_CODE=$?
+```
+
+Follows general exit contract. Exit 0 sets `NEW_PRS_RAISED="true"`.
+
+### Step 9a2: run-odh-konflux-onboarder-workflow — Release (step key: `onboarder_release`, ODH only)
+
+**Execute if** `onboarder_release` is in `UNBLOCKED_STEPS` and `PRODUCT_CONTEXT == "ODH"`.
+
+Runs only when `odh_release_tag` is present in the YAML (or legacy `build_type: Release`).
+Uses `build_type=Release`, `odh_release_tag`, and `odh_release_branch` (default `stable`).
+Jira labels: `tekton-release-pr-raised` / `tekton-release-pr-merged`.
+
+```bash
+OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_odh_onboarder_workflow.sh" --jira-url "$JIRA_URL" --pipeline-step onboarder_release)
 EXIT_CODE=$?
 ```
 
@@ -627,6 +643,7 @@ PRs / MRs:
   renovate        : <steps.renovate.status or "N/A (ODH)">
   renovate_sync   : <steps.renovate_sync.status or "N/A (ODH)">
   onboarder_workflow: <steps.onboarder_workflow.status or "N/A (RHOAI)">
+  onboarder_release:  <steps.onboarder_release.status or "N/A (RHOAI or CI-only ODH)">
 
 Newly merged this run : <NEWLY_MERGED or "none">
 State file            : $PIPELINE_STATE

@@ -18,8 +18,20 @@ def main():
     p.add_argument("--repo-branch", required=True)
     p.add_argument("--context-path", required=True)
     p.add_argument("--dockerfile-path", required=True)
-    p.add_argument("--build-type", choices=["CI", "Release"], help="ODH only")
-    p.add_argument("--odh-release-tag", help="ODH Release builds only: version tag (e.g. 2.21.0)")
+    p.add_argument(
+        "--build-type",
+        choices=["CI", "Release"],
+        help="ODH only; new tickets use CI. Legacy Release is normalized to CI plus --odh-release-tag",
+    )
+    p.add_argument(
+        "--odh-release-tag",
+        help="ODH optional: also run Release onboarder with this version tag (e.g. 2.21.0)",
+    )
+    p.add_argument(
+        "--odh-release-branch",
+        default="stable",
+        help="ODH Release onboarder target branch (default: stable)",
+    )
     p.add_argument("--architectures", help="RHOAI only; comma-separated (default: x86_64,arm64)")
     p.add_argument("--target-rhoai-version", help="RHOAI only")
     p.add_argument("--long-description", help="RHOAI only")
@@ -50,15 +62,22 @@ def main():
         sys.exit(1)
 
     if product == "ODH":
-        if not args.build_type:
-            print("ERROR: --build-type is required for ODH", file=sys.stderr)
-            sys.exit(1)
-        lines.append(f"  build_type: {args.build_type}")
-        if args.build_type == "Release":
-            if not args.odh_release_tag:
-                print("ERROR: --odh-release-tag is required for ODH Release builds", file=sys.stderr)
+        build_type = args.build_type or "CI"
+        release_tag = args.odh_release_tag
+        if build_type == "Release":
+            if not release_tag:
+                print(
+                    "ERROR: --odh-release-tag is required when --build-type Release (legacy)",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
-            lines.append(f"  odh_release_tag: {args.odh_release_tag}")
+            build_type = "CI"
+        lines.append(f"  build_type: {build_type}")
+        if release_tag:
+            lines.append(f"  odh_release_tag: {release_tag}")
+            branch = (args.odh_release_branch or "stable").strip()
+            if branch and branch != "stable":
+                lines.append(f"  odh_release_branch: {branch}")
     else:
         if not args.target_rhoai_version:
             print("ERROR: --target-rhoai-version is required for RHOAI", file=sys.stderr)

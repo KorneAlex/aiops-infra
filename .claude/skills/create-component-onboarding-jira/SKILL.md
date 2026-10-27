@@ -143,22 +143,33 @@ Re-ask if the answer is invalid (explain why and show valid options).
 **Q2 — Product-context-specific question**
 
 _If `product_context == ODH`:_
-> Is this a CI build or a Release build?
-> Options: CI, Release
 
-→ Store in `build_type`. Must be `CI` or `Release`.
+Always onboard **CI** (`build_type` is always `CI` in the YAML). Do **not** ask "CI or Release".
 
-**Q2.5 — ODH Release tag (ODH + Release only)**
+**Q2 — Also onboard ODH Release? (ODH only)**
 
-_Execute only when `product_context == ODH` and `build_type == Release`. Skip entirely otherwise._
+> Do you also need ODH Release onboarding for this component?
+> (yes / no)
 
-> What is the version tag for this release build?
+→ Store boolean `odh_also_release`. Default interpretation: `no` only when user clearly says no.
+
+**Q2.5 — ODH Release tag (ODH + yes only)**
+
+_Execute only when `product_context == ODH` and `odh_also_release` is yes. Skip entirely otherwise._
+
+> What is the ODH release version tag?
 > (e.g. 2.21.0)
 
-→ Store in `odh_release_tag`. Must be non-empty.
-  Re-ask if empty.
+→ Store in `odh_release_tag`. Must be non-empty. Re-ask if empty.
 
-**Q2.6 — Target RHOAI version (ODH only)**
+**Q2.6 — ODH Release branch (ODH + yes only)**
+
+> Which branch should the Release onboarder target?
+> Press Enter for default `stable`, or enter another branch name.
+
+→ Store in `odh_release_branch`. Default: `stable`.
+
+**Q2.7 — Target RHOAI version (ODH only)**
 
 _Execute only when `product_context == ODH`. Skip entirely for RHOAI._
 
@@ -394,8 +405,10 @@ Display a summary table of all collected values:
 Component onboarding details collected:
 
   product_context              : <value>
-  build_type / architectures   : <value>
-  odh_release_tag              : <value or N/A>   # only shown for ODH Release
+  build_type (ODH: always CI)  : CI
+  odh_release_tag              : <value or N/A>   # ODH when also onboarding Release
+  odh_release_branch           : <value or N/A>   # ODH Release branch (default stable)
+  architectures (RHOAI)        : <value or N/A>
   target_rhoai_version         : <value or N/A>   # ODH (Jira sprint) and RHOAI
   component_name               : <value>
   release_category             : <value or N/A>   # only shown for RHOAI
@@ -434,11 +447,14 @@ YAML_ARGS=(
   --dockerfile-path "$dockerfile_path"
 )
 
-# ODH-only
+# ODH-only — CI is always onboarded; Release is optional via odh_release_tag
 if [[ "$product_context" == "ODH" ]]; then
-  YAML_ARGS+=(--build-type "$build_type")
-  if [[ "$build_type" == "Release" ]]; then
+  YAML_ARGS+=(--build-type CI)
+  if [[ "${odh_also_release:-false}" == "true" ]]; then
     YAML_ARGS+=(--odh-release-tag "$odh_release_tag")
+    if [[ -n "${odh_release_branch:-}" && "${odh_release_branch}" != "stable" ]]; then
+      YAML_ARGS+=(--odh-release-branch "$odh_release_branch")
+    fi
   fi
 fi
 

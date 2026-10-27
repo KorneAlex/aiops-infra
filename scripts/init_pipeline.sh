@@ -199,6 +199,13 @@ if [[ ! -f "$PIPELINE_STATE" ]]; then
       "label_raised": "tekton-pr-raised",
       "label_done": "tekton-pr-merged"
     },
+    "onboarder_release": {
+      "status": "${SKIP_ODH_ONLY}",
+      "pr_url": "",
+      "depends_on": ["krd", "okc"],
+      "label_raised": "tekton-release-pr-raised",
+      "label_done": "tekton-release-pr-merged"
+    }
   }
 }
 EOF
@@ -235,7 +242,7 @@ else
     elif [[ "$PRODUCT_CONTEXT" == "RHOAI" ]]; then
       jq '
         .steps |= with_entries(
-          if .key == ("onboarder_workflow","onboarder")
+          if .key == ("onboarder_workflow","onboarder_release","onboarder")
              and .value.status == "pending"
           then .value.status = "skipped"
           else .
@@ -330,6 +337,21 @@ else
           "$PIPELINE_STATE" > "$TMP" && mv "$TMP" "$PIPELINE_STATE"
         echo "  krd_rpa.depends_on: added okc (RHOAI prerequisite — with build-config)" >&2
       fi
+    fi
+  fi
+
+  # onboarder_release: add step if missing (ODH CI+Release consolidation)
+  if [[ "$CURRENT_PC" == "ODH" ]]; then
+    if ! jq -e '.steps.onboarder_release' "$PIPELINE_STATE" > /dev/null 2>&1; then
+      TMP=$(mktemp)
+      jq '.steps.onboarder_release = {
+        "status": "pending",
+        "pr_url": "",
+        "depends_on": ["krd", "okc"],
+        "label_raised": "tekton-release-pr-raised",
+        "label_done": "tekton-release-pr-merged"
+      }' "$PIPELINE_STATE" > "$TMP" && mv "$TMP" "$PIPELINE_STATE"
+      echo "  added onboarder_release step (backward compat)" >&2
     fi
   fi
 
