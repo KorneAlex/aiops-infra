@@ -202,16 +202,10 @@ if [[ ! -f "$PIPELINE_STATE" ]]; then
     "onboarder_workflow": {
       "status": "${SKIP_ODH_ONLY}",
       "pr_url": "",
+      "release_pr_url": "",
       "depends_on": ["krd", "okc"],
       "label_raised": "tekton-pr-raised",
       "label_done": "tekton-pr-merged"
-    },
-    "onboarder_release": {
-      "status": "${SKIP_ODH_ONLY}",
-      "pr_url": "",
-      "depends_on": ["krd", "okc"],
-      "label_raised": "tekton-release-pr-raised",
-      "label_done": "tekton-release-pr-merged"
     }
   }
 }
@@ -249,7 +243,7 @@ else
     elif [[ "$PRODUCT_CONTEXT" == "RHOAI" ]]; then
       jq '
         .steps |= with_entries(
-          if .key == ("onboarder_workflow","onboarder_release","onboarder")
+          if .key == ("onboarder_workflow","onboarder")
              and .value.status == "pending"
           then .value.status = "skipped"
           else .
@@ -361,18 +355,19 @@ else
     fi
   fi
 
-  # onboarder_release: add step if missing (ODH CI+Release consolidation)
-  if [[ "$CURRENT_PC" == "ODH" ]]; then
-    if ! jq -e '.steps.onboarder_release' "$PIPELINE_STATE" > /dev/null 2>&1; then
+  # Drop legacy onboarder_release step (consolidated into onboarder_workflow)
+  if jq -e '.steps.onboarder_release' "$PIPELINE_STATE" > /dev/null 2>&1; then
+    TMP=$(mktemp)
+    jq 'del(.steps.onboarder_release)' "$PIPELINE_STATE" > "$TMP" && mv "$TMP" "$PIPELINE_STATE"
+    echo "  removed legacy onboarder_release step" >&2
+  fi
+
+  # onboarder_workflow: ensure release_pr_url field exists
+  if jq -e '.steps.onboarder_workflow' "$PIPELINE_STATE" > /dev/null 2>&1; then
+    if jq -e '.steps.onboarder_workflow | has("release_pr_url") | not' "$PIPELINE_STATE" > /dev/null 2>&1; then
       TMP=$(mktemp)
-      jq '.steps.onboarder_release = {
-        "status": "pending",
-        "pr_url": "",
-        "depends_on": ["krd", "okc"],
-        "label_raised": "tekton-release-pr-raised",
-        "label_done": "tekton-release-pr-merged"
-      }' "$PIPELINE_STATE" > "$TMP" && mv "$TMP" "$PIPELINE_STATE"
-      echo "  added onboarder_release step (backward compat)" >&2
+      jq '.steps.onboarder_workflow.release_pr_url = ""' "$PIPELINE_STATE" > "$TMP" && mv "$TMP" "$PIPELINE_STATE"
+      echo "  onboarder_workflow: added release_pr_url field" >&2
     fi
   fi
 

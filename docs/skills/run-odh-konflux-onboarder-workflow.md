@@ -20,9 +20,9 @@ No files are edited directly. The skill dispatches a workflow run via the GitHub
 | Input | Value |
 |-------|-------|
 | `component` | `<component_name>` |
-| `pr_target_branch` | `main` (CI) or version branch (Release) |
-| `build_type` | Always `CI` for step `onboarder_workflow`; Release run uses `onboarder_release` when `odh_release_tag` is set |
-| `version` | *(Release builds only)* |
+| `pr_target_branch` | `repo_branch` (CI) or `odh_release_branch` (Release, default `stable`) |
+| `build_type` | `CI` always; second dispatch `Release` when `odh_release_tag` is set |
+| `version` | `odh_release_tag` *(Release dispatch only)* |
 
 ### What the workflow produces
 

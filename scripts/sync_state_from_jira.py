@@ -61,8 +61,8 @@ LABEL_MAP: dict[str, tuple[str, str]] = {
     "tekton-pr-raised":             ("onboarder_workflow",  "pr_raised"),
     "onboarder-workflow-triggered": ("onboarder_workflow",  "pr_raised"),
     "tekton-pr-merged":             ("onboarder_workflow",  "done"),
-    "tekton-release-pr-raised":     ("onboarder_release",   "pr_raised"),
-    "tekton-release-pr-merged":     ("onboarder_release",   "done"),
+    "tekton-release-pr-raised":     ("onboarder_workflow",  "pr_raised"),
+    "tekton-release-pr-merged":     ("onboarder_workflow",  "done"),
     # validate
     "yaml-attached":             ("validate",         "done"),
     "validation-successful":     ("validate",         "done"),
@@ -126,9 +126,9 @@ SHARED_URL_PATTERNS: list[tuple[str, str, re.Pattern, re.Pattern]] = [
     ("renovate",        "pr_url",  re.compile(r"konflux-central/pull/", re.I),
                                    re.compile(r"\[step:renovate\]|enable\s+Renovate", re.I)),
     ("onboarder_workflow", "pr_url", re.compile(r"github\.com/[^/]+/[^/]+/pull/", re.I),
-                                   re.compile(r"\[step:onboarder_workflow\]", re.I)),
-    ("onboarder_release", "pr_url", re.compile(r"github\.com/[^/]+/[^/]+/pull/", re.I),
-                                   re.compile(r"\[step:onboarder_release\]", re.I)),
+                                   re.compile(r"\[step:onboarder_workflow\].*\bCI\b", re.I)),
+    ("onboarder_workflow", "release_pr_url", re.compile(r"github\.com/[^/]+/[^/]+/pull/", re.I),
+                                   re.compile(r"\[step:onboarder_workflow\].*\bRelease\b", re.I)),
     ("auto_merge",      "pr_url",  re.compile(r"rhods-devops-infra/pull/", re.I),
                                    re.compile(r"\[step:auto_merge\]|configure\s+auto-merge", re.I)),
     ("slack_handle",    "pr_url",  re.compile(r"rhods-devops-infra/pull/", re.I),
@@ -180,7 +180,7 @@ def extract_urls_from_comment(body) -> list[str]:
 
 
 # Steps that are bypassed under ONBOARD_DRY_RUN — never restore to pr_raised from labels
-_DRY_RUN_BYPASS_STEPS = {"onboarder_workflow", "onboarder_release", "renovate_sync"}
+_DRY_RUN_BYPASS_STEPS = {"onboarder_workflow", "renovate_sync"}
 
 
 def yaml_slack_team_handle(yaml_path: Path | None) -> str:

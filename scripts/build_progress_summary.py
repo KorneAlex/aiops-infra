@@ -29,8 +29,7 @@ STEPS_ODH = [
     ("slack_handle",      "Publish team Slack handle",       "pr_url"),
     ("krd",               "Onboard to Konflux release data", "mr_url"),
     ("okc",               "Add to ODH Konflux central",      "pr_url"),
-    ("onboarder_workflow","Trigger ODH CI onboarder",        "pr_url"),
-    ("onboarder_release", "Trigger ODH Release onboarder",  "pr_url"),
+    ("onboarder_workflow","Trigger ODH onboarder (CI + optional Release)", "pr_url"),
     ("operator",          "Integrate with ODH Operator",     "pr_url"),
     ("bundle",            "Integrate with bundle",           "pr_url"),
 ]
