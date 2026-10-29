@@ -61,8 +61,6 @@ LABEL_MAP: dict[str, tuple[str, str]] = {
     "tekton-pr-raised":             ("onboarder_workflow",  "pr_raised"),
     "onboarder-workflow-triggered": ("onboarder_workflow",  "pr_raised"),
     "tekton-pr-merged":             ("onboarder_workflow",  "done"),
-    "tekton-release-pr-raised":     ("onboarder_workflow",  "pr_raised"),
-    "tekton-release-pr-merged":     ("onboarder_workflow",  "done"),
     # validate
     "yaml-attached":             ("validate",         "done"),
     "validation-successful":     ("validate",         "done"),

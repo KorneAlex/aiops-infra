@@ -90,7 +90,7 @@ run_onboarder_dispatch() {
   local target_branch="$2"
   local version="${3:-}"
   local phase_label="$4"
-  local label_raised="$5"
+  local add_raised_label="${5:-false}"
 
   echo "Triggering odh-konflux-onboarder (${phase_label}) for component: $COMPONENT"
   echo "Build type  : $build_type"
@@ -141,16 +141,18 @@ run_onboarder_dispatch() {
   echo "Workflow triggered. Run ID: $run_id"
   echo "Run URL: $run_url"
 
-  uv run --script "$SCRIPTS_DIR/update_jira_issue.py" "$JIRA_URL" \
-    --add-label "$label_raised" \
-    --comment "[step:onboarder_workflow] ${phase_label} odh-konflux-onboarder triggered (Run #${run_id}).
+  local jira_args=(--comment "[step:onboarder_workflow] ${phase_label} odh-konflux-onboarder triggered (Run #${run_id}).
 
 Component: ${COMPONENT}
 Build type: ${build_type}
 Target branch: ${target_branch}
 Workflow run: ${run_url}
 
-Monitoring for Tekton PR URL..." || true
+Monitoring for Tekton PR URL...")
+  if [[ "$add_raised_label" == "true" ]]; then
+    jira_args=(--add-label "tekton-pr-raised" "${jira_args[@]}")
+  fi
+  uv run --script "$SCRIPTS_DIR/update_jira_issue.py" "$JIRA_URL" "${jira_args[@]}" || true
 
   local monitor_output
   monitor_output=$(uv run --script "$SCRIPTS_DIR/run_github_workflow.py" monitor \
@@ -195,11 +197,11 @@ Workflow run: ${run_url}" || true
 }
 
 if [[ -z "$CI_PR_URL" ]]; then
-  CI_PR_URL=$(run_onboarder_dispatch "CI" "$REPO_BRANCH" "" "CI" "tekton-pr-raised")
+  CI_PR_URL=$(run_onboarder_dispatch "CI" "$REPO_BRANCH" "" "CI" "true")
 fi
 
 if [[ "$NEEDS_RELEASE" == "true" && -z "$RELEASE_PR_URL" ]]; then
-  RELEASE_PR_URL=$(run_onboarder_dispatch "Release" "$ODH_RELEASE_BRANCH" "$ODH_RELEASE_TAG" "Release" "tekton-release-pr-raised")
+  RELEASE_PR_URL=$(run_onboarder_dispatch "Release" "$ODH_RELEASE_BRANCH" "$ODH_RELEASE_TAG" "Release" "false")
 fi
 
 TMP=$(mktemp)

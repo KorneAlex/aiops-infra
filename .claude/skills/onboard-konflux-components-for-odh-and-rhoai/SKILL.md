@@ -492,8 +492,8 @@ completes with no URL and is marked `done` immediately.
 The `depends_on: ["krd", "okc"]` check in Step 7 ensures both are merged before this runs.
 The wrapper always triggers CI (`build_type=CI`, `repo_branch`). If `odh_release_tag` is in the
 YAML, it also triggers Release (`build_type=Release`, release branch + tag) before exiting.
-Jira labels: `tekton-pr-raised` / `tekton-pr-merged` (CI); `tekton-release-pr-raised` /
-`tekton-release-pr-merged` when Release ran (same pipeline step).
+Use Jira labels `tekton-pr-raised` / `tekton-pr-merged` only; Release Tekton PR URL is stored in
+`release_pr_url` and noted in step comments (no separate release labels).
 
 ```bash
 OUTPUT=$(WORKDIR="$WORKDIR" PIPELINE_STATE="$PIPELINE_STATE" bash "$SCRIPTS_DIR/run_step_odh_onboarder_workflow.sh" --jira-url "$JIRA_URL")
